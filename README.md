@@ -42,8 +42,8 @@ NQS Pharma POS is a desktop application built for pharmaceutical distributors, f
 ### Developers
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/nqs-pharma-pos.git
-cd nqs-pharma-pos
+git clone https://github.com/noori909/New-Pharma-POS-System.git
+cd New-Pharma-POS-System
 
 # Create virtual environment
 python -m venv venv
