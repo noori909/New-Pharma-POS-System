@@ -10,24 +10,24 @@
 
 ---
 
-## 🌟 Executive Features
+##  Executive Features
 
-- **⚡ Zero-Delay Sales & Invoicing**: Process sales instantly even during internet outages.
-- **🏷️ Trade Price (TP) Engine**: Automatically calculates Trade Price as `MRP - 15%` (`MRP * 0.85`).
-- **🎯 Dynamic Customer Discount Tiers**: Configure custom discount tiers (e.g. Gold 12%, Silver 7%, Bronze 4%, Standard 0%) applied directly to TP.
-- **🔢 Perpetual Invoice Sequence**: Formatted as `NQS-XXX-DD-MM-YY` starting at `001` (`NQS-001-14-08-26`). Sequences increment perpetually across days without resetting.
-- **📄 Instant PDF Receipts**: Generates branded, professional PDF customer receipts via ReportLab.
+- **Zero-Delay Sales & Invoicing**: Process sales instantly even during internet outages.
+- **Trade Price (TP) Engine**: Automatically calculates Trade Price as `MRP - 15%` (`MRP * 0.85`).
+- **Dynamic Customer Discount Tiers**: Configure custom discount tiers (e.g. Gold 12%, Silver 7%, Bronze 4%, Standard 0%) applied directly to TP.
+- **Perpetual Invoice Sequence**: Formatted as `NQS-XXX-DD-MM-YY` starting at `001` (`NQS-001-14-08-26`). Sequences increment perpetually across days without resetting.
+- **Instant PDF Receipts**: Generates branded, professional PDF customer receipts via ReportLab.
 - **🚨 Low-Stock Alerts & Quick Restock**: Prominently highlights low-stock items with one-click **Quick Restock** modal.
-- **✉️ Automated 10:00 PM E.O.D "Postman"**: Compiles daily sales performance, top-moving items, and rep totals into a responsive HTML email dispatched via Gmail SMTP.
-- **🛡️ Triple-Layer Disaster Recovery**:
+- **Automated 10:00 PM E.O.D "Postman"**: Compiles daily sales performance, top-moving items, and rep totals into a responsive HTML email dispatched via Gmail SMTP.
+- **Triple-Layer Disaster Recovery**:
   1. Local SQLite Database in `%APPDATA%\NQS_POS\nqs_pos.db`.
   2. Time-Stamped `.zip` archives with **30-day automatic retention purge**.
   3. Google Drive OAuth2 background cloud synchronization.
-- **🎨 Dark & Light Color Themes**: Switchable visual styles designed for reduced eye strain during long warehouse shifts.
+- **Dark & Light Color Themes**: Switchable visual styles designed for reduced eye strain during long warehouse shifts.
 
 ---
 
-## 🛠️ System Architecture
+## System Architecture
 
 ```
 NQS/
@@ -59,7 +59,7 @@ NQS/
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### Prerequisites
 - Windows 10 / 11 (64-bit)
@@ -90,7 +90,7 @@ The single portable executable will be generated at `dist\PharmaPOS.exe`. No Pyt
 
 ---
 
-## ⚙️ Initial Configuration & Setup
+## Initial Configuration & Setup
 
 ### 1. Master Data Population
 Master Data is empty by default upon initial installation:
@@ -108,13 +108,13 @@ Master Data is empty by default upon initial installation:
 
 ### 3. Cloud Backup Configuration (Google Drive)
 1. Download your `credentials.json` file from Google Cloud Console (Desktop OAuth Client ID).
-2. Go to **Settings** → **🛡️ Disaster Recovery**.
+2. Go to **Settings** → **Disaster Recovery**.
 3. Click **"Select credentials.json File"** and choose your JSON credentials file.
-4. Click **"🔑 Authenticate via Browser"** to complete the one-time authorization. `token.json` will be saved locally in `%APPDATA%\NQS_POS\`.
+4. Click **"Authenticate via Browser"** to complete the one-time authorization. `token.json` will be saved locally in `%APPDATA%\NQS_POS\`.
 
 ---
 
-## 🔒 Security & Privacy FAQ
+## Security & Privacy FAQ
 
 ### Q: Are my Gmail App Password or Google Drive `credentials.json` exposed if I upload the code or `PharmaPOS.exe` to GitHub?
 **NO.** All private credentials, `credentials.json`, `token.json`, and database files are stored dynamically at runtime inside the local Windows user profile directory (`%APPDATA%\NQS_POS\`). They are **never hardcoded** in the source code or packaged inside `PharmaPOS.exe`. The `.gitignore` file ensures these sensitive files are excluded from git commits.
@@ -124,5 +124,3 @@ Master Data is empty by default upon initial installation:
 
 ---
 
-## 📄 License
-Proprietary & Confidential - Built for NQS Secondary Pharmaceutical Distribution Operations.
