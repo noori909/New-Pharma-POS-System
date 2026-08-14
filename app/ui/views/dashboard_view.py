@@ -1,26 +1,79 @@
 """
 Dashboard View Widget for NQS POS v2.0
-Displays real-time KPIs, prominent Low Stock Alerts table, and recent sales summary.
+Displays real-time KPIs, prominent Low Stock Alerts table, and quick restock dialog.
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QPushButton,
-    QMessageBox, QInputDialog, QAbstractItemView
+    QMessageBox, QDialog, QFormLayout, QLineEdit, QSpinBox,
+    QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from app.ui.components.stat_card import StatCard
 from app.core.models import (
     get_dashboard_summary, get_low_stock_products,
-    update_product_stock, get_invoice_by_id
+    update_product_stock, get_invoice_by_id, get_product_by_id
 )
 from app.core.pdf_receipt import generate_invoice_pdf
 import os
 import subprocess
 
 
+class QuickRestockDialog(QDialog):
+    def __init__(self, product_id: int, product_name: str, current_stock: int, parent=None):
+        super().__init__(parent)
+        self.product_id = product_id
+        self.setWindowTitle("⚠️ Quick Restock - Low Stock Alert")
+        self.setFixedWidth(380)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        form = QFormLayout()
+        form.setSpacing(14)
+
+        # Product Name (Read-Only)
+        self.lbl_prod_name = QLineEdit(product_name)
+        self.lbl_prod_name.setReadOnly(True)
+        self.lbl_prod_name.setStyleSheet("background-color: #0F172A; color: #38BDF8; font-weight: bold;")
+
+        # Current Stock (Read-Only)
+        self.lbl_curr_stock = QLineEdit(str(current_stock))
+        self.lbl_curr_stock.setReadOnly(True)
+        self.lbl_curr_stock.setStyleSheet("background-color: #0F172A; color: #EF4444; font-weight: bold;")
+
+        # New Stock Input Field (Total Stock After Restock)
+        self.spin_new_stock = QSpinBox()
+        self.spin_new_stock.setRange(0, 999999)
+        self.spin_new_stock.setValue(current_stock + 50)
+
+        form.addRow("Product Name:", self.lbl_prod_name)
+        form.addRow("Current Stock:", self.lbl_curr_stock)
+        form.addRow("New Stock Level *:", self.spin_new_stock)
+
+        layout.addLayout(form)
+
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.setProperty("class", "SecondaryBtn")
+        btn_cancel.clicked.connect(self.reject)
+        btn_box.addWidget(btn_cancel)
+
+        btn_save = QPushButton("💾 Save Stock")
+        btn_save.setProperty("class", "SuccessBtn")
+        btn_save.clicked.connect(self.accept)
+        btn_box.addWidget(btn_save)
+
+        layout.addLayout(btn_box)
+
+    def get_new_stock(self) -> int:
+        return self.spin_new_stock.value()
+
+
 class DashboardView(QWidget):
-    # Signals for navigating to other tabs
     navigate_signal = pyqtSignal(str)
 
     def __init__(self, parent=None):
@@ -85,8 +138,8 @@ class DashboardView(QWidget):
         low_stock_inner.setSpacing(12)
 
         ls_header = QHBoxLayout()
-        ls_title = QLabel("⚠️ Low Stock Inventory Alerts")
-        ls_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #F59E0B;")
+        ls_title = QLabel("🚨 Low Stock Inventory Alerts")
+        ls_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #EF4444;")
         ls_header.addWidget(ls_title)
         ls_header.addStretch()
 
@@ -145,7 +198,7 @@ class DashboardView(QWidget):
         self.table_low_stock.setRowCount(len(low_stock_items))
 
         for row_idx, item in enumerate(low_stock_items):
-            self.table_low_stock.setItem(row_idx, 0, QTableWidgetItem(item['name']))
+            self.table_low_stock.setItem(row_idx, 0, QTableWidgetItem(f"⚠️ {item['name']}"))
             self.table_low_stock.setItem(row_idx, 1, QTableWidgetItem(f"{item['mrp']:,.2f}"))
             self.table_low_stock.setItem(row_idx, 2, QTableWidgetItem(f"{item['tp']:,.2f}"))
 
@@ -154,10 +207,11 @@ class DashboardView(QWidget):
             stock_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table_low_stock.setItem(row_idx, 3, stock_item)
 
-            btn_restock = QPushButton("+ Restock")
-            btn_restock.setProperty("class", "SuccessBtn")
-            btn_restock.setStyleSheet("padding: 3px 8px; font-size: 11px;")
-            btn_restock.clicked.connect(lambda _, p_id=item['id'], p_name=item['name']: self.quick_restock(p_id, p_name))
+            # Red warning button for Quick Restock
+            btn_restock = QPushButton("🔴 Quick Restock")
+            btn_restock.setProperty("class", "DangerBtn")
+            btn_restock.setStyleSheet("padding: 4px 10px; font-size: 11px; font-weight: bold;")
+            btn_restock.clicked.connect(lambda _, p_id=item['id'], p_name=item['name'], curr_stk=item['stock']: self.open_quick_restock_dialog(p_id, p_name, curr_stk))
             self.table_low_stock.setCellWidget(row_idx, 4, btn_restock)
 
         # Load Recent Invoices Table
@@ -175,12 +229,16 @@ class DashboardView(QWidget):
             btn_pdf.clicked.connect(lambda _, i_id=inv['id']: self.print_receipt_by_id(i_id))
             self.table_recent_invoices.setCellWidget(row_idx, 3, btn_pdf)
 
-    def quick_restock(self, product_id: int, product_name: str):
-        qty, ok = QInputDialog.getInt(self, "Quick Restock", f"Enter additional stock quantity for '{product_name}':", 50, 1, 10000)
-        if ok and qty > 0:
-            update_product_stock(product_id, qty)
-            QMessageBox.information(self, "Stock Updated", f"Added {qty} units to '{product_name}'.")
-            self.load_data()
+    def open_quick_restock_dialog(self, product_id: int, product_name: str, current_stock: int):
+        dlg = QuickRestockDialog(product_id, product_name, current_stock, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_stock = dlg.get_new_stock()
+            try:
+                update_product_stock(product_id, new_stock)
+                QMessageBox.information(self, "Stock Saved", f"Updated stock for '{product_name}' to {new_stock} units.")
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to update stock: {e}")
 
     def print_receipt_by_id(self, invoice_id: int):
         inv_data = get_invoice_by_id(invoice_id)

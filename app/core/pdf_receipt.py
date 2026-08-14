@@ -13,7 +13,8 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from app.core.models import get_setting, get_app_data_dir
+from app.core.models import get_setting
+from app.core.database import get_app_data_dir
 
 
 def generate_invoice_pdf(invoice_data: dict, output_path: str = None) -> str:

@@ -1,6 +1,6 @@
 """
 Data Models and Data Access Objects (DAO) for NQS POS v2.0
-Handles all database operations for Products, Customers, Sales Reps, Areas, Invoices, and Reports.
+Handles all database operations for Products, Customers, Discount Tiers, Sales Reps, Areas, Invoices, and Reports.
 """
 
 from datetime import datetime
@@ -40,7 +40,46 @@ def get_all_settings() -> Dict[str, str]:
 
 
 # ==========================================
-# PRODUCTS DAO
+# DISCOUNT TIERS DAO
+# ==========================================
+
+def get_all_discount_tiers() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM discount_tiers ORDER BY percentage ASC;")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_discount_tier(name: str, percentage: float) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO discount_tiers (name, percentage) VALUES (?, ?);", (name.strip(), float(percentage)))
+    tier_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return tier_id
+
+
+def update_discount_tier(tier_id: int, name: str, percentage: float):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE discount_tiers SET name = ?, percentage = ? WHERE id = ?;", (name.strip(), float(percentage), int(tier_id)))
+    conn.commit()
+    conn.close()
+
+
+def delete_discount_tier(tier_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM discount_tiers WHERE id = ?;", (int(tier_id),))
+    conn.commit()
+    conn.close()
+
+
+# ==========================================
+# PRODUCTS DAO (LIKE queries on product name)
 # ==========================================
 
 def get_all_products(search_query: str = "") -> List[Dict[str, Any]]:
@@ -107,14 +146,15 @@ def update_product(product_id: int, name: str, mrp: float, stock: int, reorder_l
     conn.close()
 
 
-def update_product_stock(product_id: int, add_quantity: int):
+def update_product_stock(product_id: int, new_total_stock: int):
+    """Updates exact stock level or adds to current stock."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE products 
-        SET stock = stock + ?
+        SET stock = ?
         WHERE id = ?;
-    """, (int(add_quantity), int(product_id)))
+    """, (int(new_total_stock), int(product_id)))
     conn.commit()
     conn.close()
 
@@ -235,17 +275,19 @@ def get_all_customers(search_query: str = "") -> List[Dict[str, Any]]:
     if search_query.strip():
         term = f"%{search_query.strip()}%"
         cursor.execute("""
-            SELECT c.*, a.name AS area_name
+            SELECT c.*, a.name AS area_name, dt.name AS tier_name
             FROM customers c
             LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN discount_tiers dt ON c.discount_tier_id = dt.id
             WHERE c.name LIKE ? OR c.phone LIKE ?
             ORDER BY c.name ASC;
         """, (term, term))
     else:
         cursor.execute("""
-            SELECT c.*, a.name AS area_name
+            SELECT c.*, a.name AS area_name, dt.name AS tier_name
             FROM customers c
             LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN discount_tiers dt ON c.discount_tier_id = dt.id
             ORDER BY c.name ASC;
         """)
     rows = cursor.fetchall()
@@ -257,9 +299,10 @@ def get_customer_by_id(customer_id: int) -> Optional[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT c.*, a.name AS area_name
+        SELECT c.*, a.name AS area_name, dt.name AS tier_name
         FROM customers c
         LEFT JOIN areas a ON c.area_id = a.id
+        LEFT JOIN discount_tiers dt ON c.discount_tier_id = dt.id
         WHERE c.id = ?;
     """, (customer_id,))
     row = cursor.fetchone()
@@ -267,27 +310,27 @@ def get_customer_by_id(customer_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
-def add_customer(name: str, phone: str, address: str, area_id: Optional[int], discount_tier: float) -> int:
+def add_customer(name: str, phone: str, address: str, area_id: Optional[int], discount_tier: float, discount_tier_id: Optional[int] = None) -> int:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO customers (name, phone, address, area_id, discount_tier)
-        VALUES (?, ?, ?, ?, ?);
-    """, (name.strip(), phone.strip(), address.strip(), area_id, float(discount_tier)))
+        INSERT INTO customers (name, phone, address, area_id, discount_tier, discount_tier_id)
+        VALUES (?, ?, ?, ?, ?, ?);
+    """, (name.strip(), phone.strip(), address.strip(), area_id, float(discount_tier), discount_tier_id))
     cust_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return cust_id
 
 
-def update_customer(customer_id: int, name: str, phone: str, address: str, area_id: Optional[int], discount_tier: float):
+def update_customer(customer_id: int, name: str, phone: str, address: str, area_id: Optional[int], discount_tier: float, discount_tier_id: Optional[int] = None):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE customers 
-        SET name = ?, phone = ?, address = ?, area_id = ?, discount_tier = ?
+        SET name = ?, phone = ?, address = ?, area_id = ?, discount_tier = ?, discount_tier_id = ?
         WHERE id = ?;
-    """, (name.strip(), phone.strip(), address.strip(), area_id, float(discount_tier), int(customer_id)))
+    """, (name.strip(), phone.strip(), address.strip(), area_id, float(discount_tier), discount_tier_id, int(customer_id)))
     conn.commit()
     conn.close()
 
@@ -305,12 +348,12 @@ def delete_customer(customer_id: int):
 # ==========================================
 
 def preview_next_invoice_number() -> str:
-    """Returns projected next invoice number string without committing increment."""
-    seq_str = get_setting('next_invoice_seq', '100')
+    """Returns projected next invoice number string formatted as NQS-001-DD-MM-YY."""
+    seq_str = get_setting('next_invoice_seq', '1')
     try:
         seq = int(seq_str)
     except ValueError:
-        seq = 100
+        seq = 1
     now = datetime.now()
     return f"NQS-{seq:03d}-{now.strftime('%d-%m-%y')}"
 
@@ -319,8 +362,8 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
     """
     Transactionally creates a new invoice:
     1. Fetches Customer & Sales Rep details
-    2. Increments & formats perpetual invoice sequence ID (e.g. NQS-145-11-08-26)
-    3. Calculates line totals & totals
+    2. Increments & formats perpetual invoice sequence ID (e.g. NQS-001-14-08-26 starting at 1)
+    3. Calculates line totals & grand total
     4. Deducts stock from products
     5. Saves invoice and invoice_items
     """
@@ -350,10 +393,10 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
         if not rep:
             raise ValueError(f"Sales Rep ID {sales_rep_id} not found.")
 
-        # Fetch & increment perpetual invoice sequence
+        # Fetch & increment perpetual invoice sequence (initialized to 1)
         cursor.execute("SELECT value FROM app_settings WHERE key = 'next_invoice_seq';")
         seq_row = cursor.fetchone()
-        seq_num = int(seq_row['value']) if seq_row else 100
+        seq_num = int(seq_row['value']) if seq_row else 1
         
         now = datetime.now()
         invoice_number = f"NQS-{seq_num:03d}-{now.strftime('%d-%m-%y')}"
@@ -429,7 +472,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
                 'total_price': total_price
             })
 
-        # Update sequence for next invoice
+        # Update sequence for next invoice (increment 1 -> 2 -> 3)
         cursor.execute("UPDATE app_settings SET value = ? WHERE key = 'next_invoice_seq';", (str(seq_num + 1),))
 
         conn.commit()

@@ -1,18 +1,19 @@
 """
 Master Data Management View Widget for NQS POS v2.0
-Handles CRUD operations for Customers (with tier discounts), Sales Representatives, and Geographical Areas.
+Handles CRUD operations for Customers, Discount Tiers, Sales Representatives, and Geographical Areas.
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QDialog, QFormLayout, QComboBox, QMessageBox, QAbstractItemView
+    QDialog, QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QAbstractItemView
 )
 from PyQt6.QtCore import Qt
 from app.core.models import (
     get_all_customers, add_customer, update_customer, delete_customer,
     get_all_sales_reps, add_sales_rep, update_sales_rep, delete_sales_rep,
-    get_all_areas, add_area, update_area, delete_area
+    get_all_areas, add_area, update_area, delete_area,
+    get_all_discount_tiers, add_discount_tier, update_discount_tier, delete_discount_tier
 )
 
 
@@ -20,9 +21,10 @@ from app.core.models import (
 # CUSTOMER DIALOG
 # ==========================================
 class CustomerDialog(QDialog):
-    def __init__(self, areas: list, cust_data: dict = None, parent=None):
+    def __init__(self, areas: list, discount_tiers: list, cust_data: dict = None, parent=None):
         super().__init__(parent)
         self.areas = areas
+        self.discount_tiers = discount_tiers
         self.cust_data = cust_data
         self.setWindowTitle("Edit Customer" if cust_data else "Add New Customer")
         self.setFixedWidth(420)
@@ -50,10 +52,11 @@ class CustomerDialog(QDialog):
             self.combo_area.addItem(a['name'], a['id'])
 
         self.combo_tier = QComboBox()
-        self.combo_tier.addItem("0% Standard Discount", 0.0)
-        self.combo_tier.addItem("4% Tier Discount", 4.0)
-        self.combo_tier.addItem("7% Tier Discount", 7.0)
-        self.combo_tier.addItem("12% Special Tier Discount", 12.0)
+        if not self.discount_tiers:
+            self.combo_tier.addItem("Standard (0%)", (0.0, None))
+        else:
+            for t in self.discount_tiers:
+                self.combo_tier.addItem(f"{t['name']} ({t['percentage']:.1f}%)", (t['percentage'], t['id']))
 
         form.addRow("Customer Name *:", self.input_name)
         form.addRow("Phone Number:", self.input_phone)
@@ -76,10 +79,17 @@ class CustomerDialog(QDialog):
                     self.combo_area.setCurrentIndex(idx)
 
             # Select tier
-            tier = float(self.cust_data.get('discount_tier', 0.0))
-            idx = self.combo_tier.findData(tier)
-            if idx >= 0:
-                self.combo_tier.setCurrentIndex(idx)
+            tier_id = self.cust_data.get('discount_tier_id')
+            tier_val = float(self.cust_data.get('discount_tier', 0.0))
+            
+            found_idx = -1
+            for i in range(self.combo_tier.count()):
+                pct, tid = self.combo_tier.itemData(i)
+                if tid == tier_id or (tid is None and pct == tier_val):
+                    found_idx = i
+                    break
+            if found_idx >= 0:
+                self.combo_tier.setCurrentIndex(found_idx)
 
         btn_box = QHBoxLayout()
         btn_box.addStretch()
@@ -96,13 +106,72 @@ class CustomerDialog(QDialog):
 
         layout.addLayout(btn_box)
 
-    def get_data((self) -> dict:
+    def get_data(self) -> dict:
+        pct, tid = self.combo_tier.itemData(self.combo_tier.currentIndex())
         return {
             'name': self.input_name.text().strip(),
             'phone': self.input_phone.text().strip(),
             'address': self.input_address.text().strip(),
             'area_id': self.combo_area.currentData(),
-            'discount_tier': float(self.combo_tier.currentData() or 0.0)
+            'discount_tier': float(pct),
+            'discount_tier_id': tid
+        }
+
+
+# ==========================================
+# DISCOUNT TIER DIALOG
+# ==========================================
+class DiscountTierDialog(QDialog):
+    def __init__(self, tier_data: dict = None, parent=None):
+        super().__init__(parent)
+        self.tier_data = tier_data
+        self.setWindowTitle("Edit Discount Tier" if tier_data else "Add New Discount Tier")
+        self.setFixedWidth(360)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        self.input_name = QLineEdit()
+        self.input_name.setPlaceholderText("Tier Name (e.g. Gold, Preferred)")
+
+        self.input_percentage = QDoubleSpinBox()
+        self.input_percentage.setRange(0.0, 100.0)
+        self.input_percentage.setDecimals(1)
+        self.input_percentage.setSuffix("%")
+
+        form.addRow("Tier Name *:", self.input_name)
+        form.addRow("Discount Percentage *:", self.input_percentage)
+
+        layout.addLayout(form)
+
+        if self.tier_data:
+            self.input_name.setText(self.tier_data.get('name', ''))
+            self.input_percentage.setValue(float(self.tier_data.get('percentage', 0.0)))
+
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.setProperty("class", "SecondaryBtn")
+        btn_cancel.clicked.connect(self.reject)
+        btn_box.addWidget(btn_cancel)
+
+        btn_save = QPushButton("Save Tier")
+        btn_save.setProperty("class", "PrimaryBtn")
+        btn_save.clicked.connect(self.accept)
+        btn_box.addWidget(btn_save)
+
+        layout.addLayout(btn_box)
+
+    def get_data(self) -> dict:
+        return {
+            'name': self.input_name.text().strip(),
+            'percentage': self.input_percentage.value()
         }
 
 
@@ -240,7 +309,7 @@ class MasterDataView(QWidget):
         page_title = QLabel("Master Data Administration")
         page_title.setProperty("class", "SectionHeader")
         page_title.setStyleSheet("font-size: 20px;")
-        sub_title = QLabel("Configure Customers, Sales Representatives, and Geographical Areas")
+        sub_title = QLabel("Configure Customers, Customer Discount Tiers, Sales Representatives, and Areas")
         sub_title.setStyleSheet("color: #94A3B8; font-size: 12px;")
         title_box.addWidget(page_title)
         title_box.addWidget(sub_title)
@@ -254,12 +323,17 @@ class MasterDataView(QWidget):
         self.init_customers_tab()
         self.tab_widget.addTab(self.tab_customers, "👥 Customers Management")
 
-        # Tab 2: Sales Reps
+        # Tab 2: Discount Tiers
+        self.tab_tiers = QWidget()
+        self.init_tiers_tab()
+        self.tab_widget.addTab(self.tab_tiers, "🏷️ Discount Tiers")
+
+        # Tab 3: Sales Reps
         self.tab_reps = QWidget()
         self.init_reps_tab()
         self.tab_widget.addTab(self.tab_reps, "👔 Sales Representatives")
 
-        # Tab 3: Areas
+        # Tab 4: Areas
         self.tab_areas = QWidget()
         self.init_areas_tab()
         self.tab_widget.addTab(self.tab_areas, "📍 Geographical Areas")
@@ -309,7 +383,8 @@ class MasterDataView(QWidget):
             self.table_customers.setItem(row_idx, 2, QTableWidgetItem(c['phone'] or "-"))
             self.table_customers.setItem(row_idx, 3, QTableWidgetItem(c['area_name'] or "Unassigned"))
 
-            tier_item = QTableWidgetItem(f"{c['discount_tier']:.1f}%")
+            tier_display = f"{c.get('tier_name') or 'Tier'} ({c['discount_tier']:.1f}%)"
+            tier_item = QTableWidgetItem(tier_display)
             tier_item.setForeground(Qt.GlobalColor.cyan)
             tier_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table_customers.setItem(row_idx, 4, tier_item)
@@ -335,28 +410,30 @@ class MasterDataView(QWidget):
 
     def open_add_customer(self):
         areas = get_all_areas()
-        dlg = CustomerDialog(areas=areas, parent=self)
+        tiers = get_all_discount_tiers()
+        dlg = CustomerDialog(areas=areas, discount_tiers=tiers, parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_data()
             if not data['name']:
                 QMessageBox.warning(self, "Validation Error", "Customer name is required.")
                 return
             try:
-                add_customer(data['name'], data['phone'], data['address'], data['area_id'], data['discount_tier'])
+                add_customer(data['name'], data['phone'], data['address'], data['area_id'], data['discount_tier'], data['discount_tier_id'])
                 self.load_customers()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to add customer: {e}")
 
     def open_edit_customer(self, cust_data: dict):
         areas = get_all_areas()
-        dlg = CustomerDialog(areas=areas, cust_data=cust_data, parent=self)
+        tiers = get_all_discount_tiers()
+        dlg = CustomerDialog(areas=areas, discount_tiers=tiers, cust_data=cust_data, parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_data()
             if not data['name']:
                 QMessageBox.warning(self, "Validation Error", "Customer name is required.")
                 return
             try:
-                update_customer(cust_data['id'], data['name'], data['phone'], data['address'], data['area_id'], data['discount_tier'])
+                update_customer(cust_data['id'], data['name'], data['phone'], data['address'], data['area_id'], data['discount_tier'], data['discount_tier_id'])
                 self.load_customers()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to update customer: {e}")
@@ -373,6 +450,106 @@ class MasterDataView(QWidget):
                 self.load_customers()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete customer: {e}")
+
+    # ------------------------------------------
+    # DISCOUNT TIERS TAB LOGIC
+    # ------------------------------------------
+    def init_tiers_tab(self):
+        layout = QVBoxLayout(self.tab_tiers)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        top_bar = QHBoxLayout()
+        lbl_info = QLabel("Configure standard customer discount tiers (e.g. 0%, 4%, 7%, 12%) applied to Trade Price (TP).")
+        lbl_info.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        top_bar.addWidget(lbl_info)
+        top_bar.addStretch()
+
+        btn_add_tier = QPushButton("+ Add Discount Tier")
+        btn_add_tier.setProperty("class", "PrimaryBtn")
+        btn_add_tier.clicked.connect(self.open_add_tier)
+        top_bar.addWidget(btn_add_tier)
+
+        layout.addLayout(top_bar)
+
+        self.table_tiers = QTableWidget()
+        self.table_tiers.setColumnCount(4)
+        self.table_tiers.setHorizontalHeaderLabels(["#", "Tier Name", "Discount Percentage", "Actions"])
+        self.table_tiers.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table_tiers.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table_tiers)
+
+        self.load_tiers()
+
+    def load_tiers(self):
+        tiers = get_all_discount_tiers()
+        self.table_tiers.setRowCount(len(tiers))
+
+        for row_idx, t in enumerate(tiers):
+            self.table_tiers.setItem(row_idx, 0, QTableWidgetItem(str(row_idx + 1)))
+            self.table_tiers.setItem(row_idx, 1, QTableWidgetItem(t['name']))
+            
+            pct_item = QTableWidgetItem(f"{t['percentage']:.1f}%")
+            pct_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_tiers.setItem(row_idx, 2, pct_item)
+
+            actions = QWidget()
+            act_l = QHBoxLayout(actions)
+            act_l.setContentsMargins(4, 2, 4, 2)
+            act_l.setSpacing(6)
+
+            btn_e = QPushButton("Edit")
+            btn_e.setProperty("class", "SecondaryBtn")
+            btn_e.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_e.clicked.connect(lambda _, tier=t: self.open_edit_tier(tier))
+            act_l.addWidget(btn_e)
+
+            btn_d = QPushButton("Delete")
+            btn_d.setProperty("class", "DangerBtn")
+            btn_d.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_d.clicked.connect(lambda _, t_id=t['id'], t_name=t['name']: self.delete_tier_action(t_id, t_name))
+            act_l.addWidget(btn_d)
+
+            self.table_tiers.setCellWidget(row_idx, 3, actions)
+
+    def open_add_tier(self):
+        dlg = DiscountTierDialog(parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            data = dlg.get_data()
+            if not data['name']:
+                QMessageBox.warning(self, "Validation Error", "Tier name is required.")
+                return
+            try:
+                add_discount_tier(data['name'], data['percentage'])
+                self.load_tiers()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to add tier: {e}")
+
+    def open_edit_tier(self, tier_data: dict):
+        dlg = DiscountTierDialog(tier_data=tier_data, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            data = dlg.get_data()
+            if not data['name']:
+                QMessageBox.warning(self, "Validation Error", "Tier name is required.")
+                return
+            try:
+                update_discount_tier(tier_data['id'], data['name'], data['percentage'])
+                self.load_tiers()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to update tier: {e}")
+
+    def delete_tier_action(self, tier_id: int, tier_name: str):
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Are you sure you want to delete discount tier '{tier_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                delete_discount_tier(tier_id)
+                self.load_tiers()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete tier: {e}")
 
     # ------------------------------------------
     # SALES REPS TAB LOGIC

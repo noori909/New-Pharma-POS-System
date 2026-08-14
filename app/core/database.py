@@ -1,7 +1,7 @@
 """
-Database Layer for NQS POS v2.0
-Handles SQLite initialization, table creation, and connection pooling.
-All user data is stored in %APPDATA%/NQS_POS/nqs_pos.db for machine independence and safety.
+Database Layer & Schema Migration Engine for NQS POS v2.0
+Handles SQLite connection setup, initial table creation, and incremental schema migrations.
+Stored in %APPDATA%/NQS_POS/nqs_pos.db for machine independence and data safety.
 """
 
 import os
@@ -19,6 +19,8 @@ def get_app_data_dir() -> Path:
     
     base_dir.mkdir(parents=True, exist_ok=True)
     (base_dir / "backups").mkdir(parents=True, exist_ok=True)
+    (base_dir / "receipts").mkdir(parents=True, exist_ok=True)
+    (base_dir / "reports").mkdir(parents=True, exist_ok=True)
     return base_dir
 
 
@@ -37,11 +39,30 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db():
-    """Initializes SQLite database schemas if not present."""
+    """Initializes SQLite database and runs incremental schema migrations."""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 1. Products Table
+    # 1. Schema Migrations Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        description TEXT NOT NULL,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 2. Discount Tiers Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS discount_tiers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        percentage REAL NOT NULL DEFAULT 0.0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 3. Products Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +74,7 @@ def init_db():
     );
     """)
 
-    # 2. Areas Table
+    # 4. Areas Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS areas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +84,7 @@ def init_db():
     );
     """)
 
-    # 3. Sales Reps Table
+    # 5. Sales Reps Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sales_reps (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +95,7 @@ def init_db():
     );
     """)
 
-    # 4. Customers Table
+    # 6. Customers Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,12 +104,14 @@ def init_db():
         address TEXT DEFAULT '',
         area_id INTEGER,
         discount_tier REAL NOT NULL DEFAULT 0.0,
+        discount_tier_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE SET NULL
+        FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE SET NULL,
+        FOREIGN KEY (discount_tier_id) REFERENCES discount_tiers(id) ON DELETE SET NULL
     );
     """)
 
-    # 5. Invoices Table
+    # 7. Invoices Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +132,7 @@ def init_db():
     );
     """)
 
-    # 6. Invoice Items Table
+    # 8. Invoice Items Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS invoice_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,7 +150,7 @@ def init_db():
     );
     """)
 
-    # 7. App Settings Table
+    # 9. App Settings Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -135,9 +158,9 @@ def init_db():
     );
     """)
 
-    # Set default settings if not exists
+    # Initial App Settings (seq_num initialized to 1 as requested)
     default_settings = {
-        'next_invoice_seq': '100',  # Configurable sequence start
+        'next_invoice_seq': '1',  # Starting value 1 -> NQS-001-DD-MM-YY
         'smtp_email': '',
         'smtp_password': '',
         'recipient_emails': '',
@@ -152,5 +175,45 @@ def init_db():
     for key, val in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?);", (key, val))
 
+    # Seed Default Discount Tiers if empty
+    cursor.execute("SELECT COUNT(*) as count FROM discount_tiers;")
+    if cursor.fetchone()['count'] == 0:
+        default_tiers = [
+            ("Standard (0%)", 0.0),
+            ("Tier 1 (4%)", 4.0),
+            ("Tier 2 (7%)", 7.0),
+            ("Tier 3 (12%)", 12.0)
+        ]
+        for t_name, t_pct in default_tiers:
+            cursor.execute("INSERT INTO discount_tiers (name, percentage) VALUES (?, ?);", (t_name, t_pct))
+
     conn.commit()
+
+    # Run Schema Migrations
+    run_migrations(conn)
+
     conn.close()
+
+
+def run_migrations(conn: sqlite3.Connection):
+    """
+    Checks applied schema migration versions and executes pending incremental migrations.
+    No Alembic dependency required.
+    """
+    cursor = conn.cursor()
+
+    # Helper to check if version is applied
+    def is_applied(v_id: int) -> bool:
+        cursor.execute("SELECT 1 FROM schema_migrations WHERE version = ?;", (v_id,))
+        return cursor.fetchone() is not None
+
+    # Migration 1: Base Version Tracker
+    if not is_applied(1):
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (1, 'Initial Base Schema');")
+        conn.commit()
+
+    # Migration 2: Ensure perpetual invoice sequence is initialized
+    if not is_applied(2):
+        cursor.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('next_invoice_seq', '1');")
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (2, 'Ensure starting invoice seq set to 1');")
+        conn.commit()

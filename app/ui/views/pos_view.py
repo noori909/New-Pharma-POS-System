@@ -165,7 +165,7 @@ class POSView(QWidget):
         btn_add.setProperty("class", "PrimaryBtn")
         btn_add.setStyleSheet("margin-top: 14px; padding: 9px 16px;")
         btn_add.clicked.connect(self.add_product_to_cart)
-        search_layout.addWidget(btn_add, 1.5)
+        search_layout.addWidget(btn_add, 2)
 
         main_layout.addWidget(search_frame)
 
@@ -245,7 +245,7 @@ class POSView(QWidget):
         btn_clear.clicked.connect(self.clear_cart)
         summary_layout.addWidget(btn_clear)
 
-        body_layout.addWidget(summary_frame, 1.3)
+        body_layout.addWidget(summary_frame, 1)
 
         main_layout.addLayout(body_layout)
 
