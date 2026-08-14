@@ -1,0 +1,33 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec.bak
+
+# Local Database & AppData files
+*.db
+*.db-wal
+*.db-shm
+backups/
+receipts/
+reports/
+
+# Sensitive Credentials & Tokens (NEVER COMMIT)
+credentials.json
+token.json
+.env
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
