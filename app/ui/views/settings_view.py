@@ -1,12 +1,12 @@
 """
-Settings, Configuration & Disaster Recovery View Widget for NQS POS v2.0
-Manages general options, Gmail Postman SMTP credentials, Google Drive OAuth authentication, and database backups.
+Settings, Configuration & Disaster Recovery View Widget for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
+Manages general options, store branding & contacts, Drug Act 1976 warranty, Gmail Postman SMTP credentials, Google Drive OAuth, and database backups.
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QFormLayout, QMessageBox, QFileDialog, QSpinBox, QAbstractItemView
+    QFormLayout, QMessageBox, QFileDialog, QSpinBox, QTextEdit, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from app.core.models import get_setting, set_setting
@@ -30,37 +30,38 @@ class SettingsView(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(14, 12, 14, 12)
+        main_layout.setSpacing(12)
 
         # Header Title
         title_box = QVBoxLayout()
         page_title = QLabel("System Settings & Disaster Recovery")
         page_title.setProperty("class", "SectionHeader")
-        page_title.setStyleSheet("font-size: 20px;")
-        sub_title = QLabel("Configure email reporting, Google Drive OAuth sync, and local backups")
-        sub_title.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        page_title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        sub_title = QLabel("New Quetta Surgical and Medicine Distribution • Store Info, Email Reporting & Cloud Backups")
+        sub_title.setProperty("class", "SubHeader")
+        sub_title.setStyleSheet("font-size: 12px;")
         title_box.addWidget(page_title)
         title_box.addWidget(sub_title)
         main_layout.addLayout(title_box)
 
-        # Settings Tabs
+        # Settings Tabs (Zero Emojis)
         self.tab_widget = QTabWidget()
 
         # Tab 1: General & Theme
         self.tab_general = QWidget()
         self.init_general_tab()
-        self.tab_widget.addTab(self.tab_general, "⚙️ General & Branding")
+        self.tab_widget.addTab(self.tab_general, "General & Branding")
 
         # Tab 2: Email & Postman
         self.tab_email = QWidget()
         self.init_email_tab()
-        self.tab_widget.addTab(self.tab_email, "✉️ E.O.D Postman Email")
+        self.tab_widget.addTab(self.tab_email, "E.O.D Postman Email")
 
         # Tab 3: Backup & Cloud Restore
         self.tab_backup = QWidget()
         self.init_backup_tab()
-        self.tab_widget.addTab(self.tab_backup, "🛡️ Triple-Layer Disaster Recovery")
+        self.tab_widget.addTab(self.tab_backup, "Triple-Layer Disaster Recovery")
 
         main_layout.addWidget(self.tab_widget)
 
@@ -76,18 +77,24 @@ class SettingsView(QWidget):
         form_frame.setProperty("class", "CardFrame")
         form = QFormLayout(form_frame)
         form.setContentsMargins(20, 20, 20, 20)
-        form.setSpacing(14)
+        form.setSpacing(12)
 
         self.input_biz_name = QLineEdit()
         self.input_biz_address = QLineEdit()
         self.input_biz_phone = QLineEdit()
+        self.input_biz_email = QLineEdit()
+
+        self.input_warranty = QTextEdit()
+        self.input_warranty.setFixedHeight(80)
 
         self.spin_next_seq = QSpinBox()
         self.spin_next_seq.setRange(1, 999999)
 
-        form.addRow("Business / Warehouse Name:", self.input_biz_name)
-        form.addRow("Business Address:", self.input_biz_address)
-        form.addRow("Contact Phone:", self.input_biz_phone)
+        form.addRow("Store Title / Business Name *:", self.input_biz_name)
+        form.addRow("Store Address *:", self.input_biz_address)
+        form.addRow("Contact Phone *:", self.input_biz_phone)
+        form.addRow("Store Email (Gmail) *:", self.input_biz_email)
+        form.addRow("Drug Act 1976 Warranty Text *:", self.input_warranty)
         form.addRow("Next Perpetual Invoice Counter:", self.spin_next_seq)
 
         layout.addWidget(form_frame)
@@ -103,12 +110,12 @@ class SettingsView(QWidget):
         theme_layout.addWidget(lbl_theme)
         theme_layout.addStretch()
 
-        btn_dark = QPushButton("🌙 Dark Theme")
+        btn_dark = QPushButton("Dark Theme")
         btn_dark.setProperty("class", "SecondaryBtn")
         btn_dark.clicked.connect(lambda: self.switch_theme("dark"))
         theme_layout.addWidget(btn_dark)
 
-        btn_light = QPushButton("☀️ Light Theme")
+        btn_light = QPushButton("Light Theme")
         btn_light.setProperty("class", "SecondaryBtn")
         btn_light.clicked.connect(lambda: self.switch_theme("light"))
         theme_layout.addWidget(btn_light)
@@ -124,22 +131,33 @@ class SettingsView(QWidget):
         self.load_general_settings()
 
     def load_general_settings(self):
-        self.input_biz_name.setText(get_setting('business_name', 'NQS Pharmaceutical Distributors'))
-        self.input_biz_address.setText(get_setting('business_address', 'Warehouse Operations'))
-        self.input_biz_phone.setText(get_setting('business_phone', '+92-300-1234567'))
+        self.input_biz_name.setText(get_setting('business_name', 'New Quetta Surgical and Medicine Distribution'))
+        self.input_biz_address.setText(get_setting('business_address', 'Ramzan Plaza Near Saleem Complex, Ptail Bagh. Quetta.'))
+        self.input_biz_phone.setText(get_setting('business_phone', '0334-2045896'))
+        self.input_biz_email.setText(get_setting('business_email', 'newquettamedicalandsurgical@gmail.com'))
 
-        seq_str = get_setting('next_invoice_seq', '100')
+        default_war = (
+            "Warranty: Under section 23(1) of the drug act 1976, I Nazir Ahmed being a person resident in Pakistan "
+            "Carrying business at Ramzan plaza Patail Bagh Quetta under the name of New Quetta Surgical and Medicine Distribution "
+            "being an authorized distributor do hereby give this warranty that drugs described in this invoice bill as sold by us "
+            "do not contrivance in any way the provisions of section 23 of drug act 1976."
+        )
+        self.input_warranty.setPlainText(get_setting('warranty_text', default_war))
+
+        seq_str = get_setting('next_invoice_seq', '1')
         try:
             self.spin_next_seq.setValue(int(seq_str))
         except ValueError:
-            self.spin_next_seq.setValue(100)
+            self.spin_next_seq.setValue(1)
 
     def save_general_settings(self):
         set_setting('business_name', self.input_biz_name.text().strip())
         set_setting('business_address', self.input_biz_address.text().strip())
         set_setting('business_phone', self.input_biz_phone.text().strip())
+        set_setting('business_email', self.input_biz_email.text().strip())
+        set_setting('warranty_text', self.input_warranty.toPlainText().strip())
         set_setting('next_invoice_seq', str(self.spin_next_seq.value()))
-        QMessageBox.information(self, "Settings Saved", "General settings saved successfully.")
+        QMessageBox.information(self, "Settings Saved", "General settings and store info saved successfully.")
 
     def switch_theme(self, theme_name: str):
         set_setting('theme', theme_name)
@@ -161,14 +179,14 @@ class SettingsView(QWidget):
         form.setSpacing(14)
 
         self.input_smtp_email = QLineEdit()
-        self.input_smtp_email.setPlaceholderText("e.g. nqs.warehouse@gmail.com")
+        self.input_smtp_email.setPlaceholderText("e.g. newquettamedicalandsurgical@gmail.com")
 
         self.input_smtp_pwd = QLineEdit()
         self.input_smtp_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_smtp_pwd.setPlaceholderText("Gmail App Password (16-character code)")
 
         self.input_recipients = QLineEdit()
-        self.input_recipients.setPlaceholderText("e.g. boss@nqs.com, manager@nqs.com (comma separated)")
+        self.input_recipients.setPlaceholderText("e.g. owner@gmail.com, manager@gmail.com (comma separated)")
 
         form.addRow("Sender Gmail Address *:", self.input_smtp_email)
         form.addRow("Gmail App Password *:", self.input_smtp_pwd)
@@ -182,7 +200,7 @@ class SettingsView(QWidget):
         btn_save_email.clicked.connect(self.save_email_settings)
         btn_box.addWidget(btn_save_email)
 
-        btn_test_email = QPushButton("📧 Test Send E.O.D Email Now")
+        btn_test_email = QPushButton("Test Send E.O.D Email Now")
         btn_test_email.setProperty("class", "SecondaryBtn")
         btn_test_email.clicked.connect(self.test_send_email)
         btn_box.addWidget(btn_test_email)
@@ -206,7 +224,7 @@ class SettingsView(QWidget):
         self.save_email_settings()
         res = dispatch_eod_email()
         if res.get('success'):
-            QMessageBox.information(self, "Success", f"Test E.O.D email dispatched successfully to recipients!")
+            QMessageBox.information(self, "Success", "Test E.O.D email dispatched successfully to recipients!")
         else:
             QMessageBox.critical(self, "Dispatch Error", f"Failed to send email: {res.get('error')}")
 
@@ -225,8 +243,8 @@ class SettingsView(QWidget):
         gdrive_l.setContentsMargins(16, 14, 16, 14)
         gdrive_l.setSpacing(10)
 
-        gd_title = QLabel("☁️ Cloud Vault (Google Drive OAuth2 Mirroring)")
-        gd_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #38BDF8;")
+        gd_title = QLabel("Cloud Vault (Google Drive OAuth2 Mirroring)")
+        gd_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #0284C7;")
         gdrive_l.addWidget(gd_title)
 
         self.lbl_gdrive_status = QLabel("Google Drive Sync Status: Checking...")
@@ -239,12 +257,12 @@ class SettingsView(QWidget):
         btn_import_cred.clicked.connect(self.import_gdrive_credentials)
         gd_btns.addWidget(btn_import_cred)
 
-        btn_auth_gdrive = QPushButton("🔑 Authenticate via Browser")
+        btn_auth_gdrive = QPushButton("Authenticate via Browser")
         btn_auth_gdrive.setProperty("class", "PrimaryBtn")
         btn_auth_gdrive.clicked.connect(self.auth_gdrive_action)
         gd_btns.addWidget(btn_auth_gdrive)
 
-        btn_test_upload = QPushButton("☁️ Upload Backup to Drive Now")
+        btn_test_upload = QPushButton("Upload Backup to Drive Now")
         btn_test_upload.setProperty("class", "SuccessBtn")
         btn_test_upload.clicked.connect(self.test_upload_gdrive)
         gd_btns.addWidget(btn_test_upload)
@@ -260,7 +278,7 @@ class SettingsView(QWidget):
         local_l.setSpacing(12)
 
         loc_hdr = QHBoxLayout()
-        loc_title = QLabel("💾 Time-Stamped Local ZIP Backups (30-Day Auto Retention)")
+        loc_title = QLabel("Time-Stamped Local ZIP Backups (30-Day Auto Retention)")
         loc_title.setStyleSheet("font-weight: bold; font-size: 14px;")
         loc_hdr.addWidget(loc_title)
         loc_hdr.addStretch()
@@ -285,11 +303,11 @@ class SettingsView(QWidget):
     def refresh_backup_status(self):
         # Update GDrive Status
         if is_gdrive_configured():
-            self.lbl_gdrive_status.setText("Google Drive Sync Status: ✅ Configured & Ready")
-            self.lbl_gdrive_status.setStyleSheet("color: #10B981; font-weight: bold;")
+            self.lbl_gdrive_status.setText("Google Drive Sync Status: Configured & Ready")
+            self.lbl_gdrive_status.setStyleSheet("color: #16A34A; font-weight: bold;")
         else:
-            self.lbl_gdrive_status.setText("Google Drive Sync Status: ⚠️ Not Authenticated (Import credentials.json first)")
-            self.lbl_gdrive_status.setStyleSheet("color: #F59E0B; font-weight: bold;")
+            self.lbl_gdrive_status.setText("Google Drive Sync Status: Not Authenticated (Import credentials.json first)")
+            self.lbl_gdrive_status.setStyleSheet("color: #D97706; font-weight: bold;")
 
         # Load Local Backups
         backups = list_local_backups()
@@ -312,7 +330,7 @@ class SettingsView(QWidget):
             try:
                 dest = get_credentials_path()
                 shutil.copy(file_path, dest)
-                QMessageBox.information(self, "Credentials Imported", f"Imported credentials.json successfully.")
+                QMessageBox.information(self, "Credentials Imported", "Imported credentials.json successfully.")
                 self.refresh_backup_status()
             except Exception as e:
                 QMessageBox.critical(self, "Import Error", f"Failed to import credentials: {e}")
@@ -341,7 +359,7 @@ class SettingsView(QWidget):
             zip_path = create_local_backup()
             res = upload_backup_to_gdrive(zip_path)
             if res.get('success'):
-                QMessageBox.information(self, "Cloud Mirror Success", f"Backup mirrored to Google Drive successfully!")
+                QMessageBox.information(self, "Cloud Mirror Success", "Backup mirrored to Google Drive successfully!")
             else:
                 QMessageBox.warning(self, "Upload Warning", f"Drive upload failed: {res.get('error')}")
         except Exception as e:

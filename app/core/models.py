@@ -1,5 +1,5 @@
 """
-Data Models and Data Access Objects (DAO) for NQS POS v2.0
+Data Models and Data Access Objects (DAO) for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
 Handles all database operations for Products, Customers, Discount Tiers, Sales Reps, Areas, Invoices, and Reports.
 """
 
@@ -79,7 +79,7 @@ def delete_discount_tier(tier_id: int):
 
 
 # ==========================================
-# PRODUCTS DAO (LIKE queries on product name)
+# PRODUCTS DAO
 # ==========================================
 
 def get_all_products(search_query: str = "") -> List[Dict[str, Any]]:
@@ -101,7 +101,10 @@ def get_all_products(search_query: str = "") -> List[Dict[str, Any]]:
     result = []
     for r in rows:
         item = dict(r)
-        item['tp'] = calculate_tp(item['mrp'])
+        has_tp = bool(item.get('has_tp', 1))
+        item['has_tp'] = has_tp
+        item['default_discount'] = float(item.get('default_discount', 0.0))
+        item['tp'] = calculate_tp(item['mrp'], has_tp=has_tp)
         item['is_low_stock'] = item['stock'] <= item['reorder_level']
         result.append(item)
     return result
@@ -116,32 +119,35 @@ def get_product_by_id(product_id: int) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     item = dict(row)
-    item['tp'] = calculate_tp(item['mrp'])
+    has_tp = bool(item.get('has_tp', 1))
+    item['has_tp'] = has_tp
+    item['default_discount'] = float(item.get('default_discount', 0.0))
+    item['tp'] = calculate_tp(item['mrp'], has_tp=has_tp)
     item['is_low_stock'] = item['stock'] <= item['reorder_level']
     return item
 
 
-def add_product(name: str, mrp: float, stock: int, reorder_level: int) -> int:
+def add_product(name: str, mrp: float, stock: int, reorder_level: int, has_tp: bool = True, default_discount: float = 0.0) -> int:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO products (name, mrp, stock, reorder_level)
-        VALUES (?, ?, ?, ?);
-    """, (name.strip(), float(mrp), int(stock), int(reorder_level)))
+        INSERT INTO products (name, mrp, stock, reorder_level, has_tp, default_discount)
+        VALUES (?, ?, ?, ?, ?, ?);
+    """, (name.strip(), float(mrp), int(stock), int(reorder_level), 1 if has_tp else 0, float(default_discount)))
     product_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return product_id
 
 
-def update_product(product_id: int, name: str, mrp: float, stock: int, reorder_level: int):
+def update_product(product_id: int, name: str, mrp: float, stock: int, reorder_level: int, has_tp: bool = True, default_discount: float = 0.0):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE products 
-        SET name = ?, mrp = ?, stock = ?, reorder_level = ?
+        SET name = ?, mrp = ?, stock = ?, reorder_level = ?, has_tp = ?, default_discount = ?
         WHERE id = ?;
-    """, (name.strip(), float(mrp), int(stock), int(reorder_level), int(product_id)))
+    """, (name.strip(), float(mrp), int(stock), int(reorder_level), 1 if has_tp else 0, float(default_discount), int(product_id)))
     conn.commit()
     conn.close()
 
@@ -180,7 +186,10 @@ def get_low_stock_products() -> List[Dict[str, Any]]:
     result = []
     for r in rows:
         item = dict(r)
-        item['tp'] = calculate_tp(item['mrp'])
+        has_tp = bool(item.get('has_tp', 1))
+        item['has_tp'] = has_tp
+        item['default_discount'] = float(item.get('default_discount', 0.0))
+        item['tp'] = calculate_tp(item['mrp'], has_tp=has_tp)
         item['is_low_stock'] = True
         result.append(item)
     return result
@@ -358,17 +367,19 @@ def preview_next_invoice_number() -> str:
     return f"NQS-{seq:03d}-{now.strftime('%d-%m-%y')}"
 
 
-def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[str, Any]], payment_mode: str = "Cash") -> Dict[str, Any]:
     """
     Transactionally creates a new invoice:
     1. Fetches Customer & Sales Rep details
     2. Increments & formats perpetual invoice sequence ID (e.g. NQS-001-14-08-26 starting at 1)
-    3. Calculates line totals & grand total
+    3. Calculates line totals & grand total taking into account TP or MRP and custom discount %
     4. Deducts stock from products
-    5. Saves invoice and invoice_items
+    5. Saves invoice with payment_mode ('Cash' or 'Credit') and invoice_items
     """
     if not cart_items:
         raise ValueError("Cannot create invoice with empty cart items.")
+
+    valid_payment_mode = "Credit" if str(payment_mode).strip().lower() == "credit" else "Cash"
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -409,8 +420,8 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
             INSERT INTO invoices (
                 invoice_number, seq_num, customer_id, customer_name,
                 sales_rep_id, sales_rep_name, area_name, discount_tier,
-                subtotal, discount_amount, grand_total, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                payment_mode, subtotal, discount_amount, grand_total, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             invoice_number,
             seq_num,
@@ -420,6 +431,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
             rep['name'],
             cust['area_name'] or "General",
             float(cust['discount_tier']),
+            valid_payment_mode,
             summary['subtotal'],
             summary['discount_amount'],
             summary['grand_total'],
@@ -434,7 +446,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
             qty = int(item['quantity'])
             
             # Check stock
-            cursor.execute("SELECT name, stock, mrp FROM products WHERE id = ?;", (product_id,))
+            cursor.execute("SELECT name, stock, mrp, has_tp FROM products WHERE id = ?;", (product_id,))
             prod = cursor.fetchone()
             if not prod:
                 raise ValueError(f"Product ID {product_id} not found.")
@@ -443,18 +455,21 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
                 raise ValueError(f"Insufficient stock for '{prod['name']}'. Available: {prod['stock']}, Requested: {qty}.")
 
             mrp = float(item.get('mrp', prod['mrp']))
-            tp = calculate_tp(mrp)
+            has_tp = bool(item.get('has_tp', bool(prod['has_tp'])))
+            tp = calculate_tp(mrp, has_tp=has_tp)
+
+            # Customer discount tier is default, but item-level discount takes precedence if specified
             disc_pct = float(item.get('discount_percent', cust['discount_tier']))
             final_rate = calculate_final_rate(tp, disc_pct)
             total_price = calculate_line_total(final_rate, qty)
 
             cursor.execute("""
                 INSERT INTO invoice_items (
-                    invoice_id, product_id, product_name, mrp, tp,
+                    invoice_id, product_id, product_name, mrp, has_tp, tp,
                     discount_percent, final_rate, quantity, total_price
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
-                invoice_id, product_id, prod['name'], mrp, tp,
+                invoice_id, product_id, prod['name'], mrp, 1 if has_tp else 0, tp,
                 disc_pct, final_rate, qty, total_price
             ))
 
@@ -465,6 +480,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
                 'product_id': product_id,
                 'product_name': prod['name'],
                 'mrp': mrp,
+                'has_tp': has_tp,
                 'tp': tp,
                 'discount_percent': disc_pct,
                 'final_rate': final_rate,
@@ -489,6 +505,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
             'sales_rep_name': rep['name'],
             'area_name': cust['area_name'] or "General",
             'discount_tier': cust['discount_tier'],
+            'payment_mode': valid_payment_mode,
             'subtotal': summary['subtotal'],
             'discount_amount': summary['discount_amount'],
             'grand_total': summary['grand_total'],
@@ -503,7 +520,7 @@ def create_invoice(customer_id: int, sales_rep_id: int, cart_items: List[Dict[st
         conn.close()
 
 
-def get_invoices(start_date: Optional[str] = None, end_date: Optional[str] = None, search_query: str = "") -> List[Dict[str, Any]]:
+def get_invoices(start_date: Optional[str] = None, end_date: Optional[str] = None, search_query: str = "", payment_mode: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -520,6 +537,9 @@ def get_invoices(start_date: Optional[str] = None, end_date: Optional[str] = Non
         term = f"%{search_query.strip()}%"
         query += " AND (invoice_number LIKE ? OR customer_name LIKE ? OR sales_rep_name LIKE ?)"
         params.extend([term, term, term])
+    if payment_mode and payment_mode != "All":
+        query += " AND payment_mode = ?"
+        params.append(payment_mode)
 
     query += " ORDER BY id DESC;"
 
@@ -527,7 +547,13 @@ def get_invoices(start_date: Optional[str] = None, end_date: Optional[str] = Non
     rows = cursor.fetchall()
     conn.close()
 
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        if not d.get('payment_mode'):
+            d['payment_mode'] = 'Cash'
+        result.append(d)
+    return result
 
 
 def get_invoice_by_id(invoice_id: int) -> Optional[Dict[str, Any]]:
@@ -540,6 +566,8 @@ def get_invoice_by_id(invoice_id: int) -> Optional[Dict[str, Any]]:
         return None
 
     inv = dict(inv_row)
+    if not inv.get('payment_mode'):
+        inv['payment_mode'] = 'Cash'
 
     # Fetch customer extra info
     cursor.execute("SELECT phone, address FROM customers WHERE id = ?;", (inv['customer_id'],))
@@ -556,7 +584,13 @@ def get_invoice_by_id(invoice_id: int) -> Optional[Dict[str, Any]]:
     items_rows = cursor.fetchall()
     conn.close()
 
-    inv['items'] = [dict(i) for i in items_rows]
+    items = []
+    for i in items_rows:
+        item_d = dict(i)
+        item_d['has_tp'] = bool(item_d.get('has_tp', 1))
+        items.append(item_d)
+
+    inv['items'] = items
     return inv
 
 
@@ -570,9 +604,15 @@ def get_dashboard_summary() -> Dict[str, Any]:
 
     today_str = datetime.now().strftime('%Y-%m-%d')
 
-    # Today's Sales & Invoices Count
+    # Today's Sales & Invoices Count (Overall + Cash + Credit)
     cursor.execute("""
-        SELECT COUNT(*) as count, COALESCE(SUM(grand_total), 0.0) as total_revenue
+        SELECT 
+            COUNT(*) as count, 
+            COALESCE(SUM(grand_total), 0.0) as total_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Cash' THEN grand_total ELSE 0 END), 0.0) as cash_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Credit' THEN grand_total ELSE 0 END), 0.0) as credit_revenue,
+            COUNT(CASE WHEN payment_mode = 'Cash' THEN 1 END) as cash_count,
+            COUNT(CASE WHEN payment_mode = 'Credit' THEN 1 END) as credit_count
         FROM invoices
         WHERE DATE(created_at) = DATE(?);
     """, (today_str,))
@@ -588,67 +628,115 @@ def get_dashboard_summary() -> Dict[str, Any]:
 
     # Recent 5 Invoices
     cursor.execute("SELECT * FROM invoices ORDER BY id DESC LIMIT 5;")
-    recent_invs = [dict(r) for r in cursor.fetchall()]
+    recent_invs = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        if not d.get('payment_mode'):
+            d['payment_mode'] = 'Cash'
+        recent_invs.append(d)
 
     conn.close()
 
     return {
         'today_revenue': float(today_row['total_revenue']),
+        'today_cash_revenue': float(today_row['cash_revenue']),
+        'today_credit_revenue': float(today_row['credit_revenue']),
         'today_invoices_count': int(today_row['count']),
+        'today_cash_count': int(today_row['cash_count']),
+        'today_credit_count': int(today_row['credit_count']),
         'total_products_count': int(prod_row['count']),
         'low_stock_count': int(low_stock_row['count']),
         'recent_invoices': recent_invs
     }
 
 
-def get_sales_by_sales_rep(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+def get_sales_by_sales_rep(start_date: str, end_date: str, payment_mode: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+    query = """
         SELECT 
             sales_rep_name,
             COUNT(id) AS total_invoices,
-            SUM(grand_total) AS total_revenue
+            COALESCE(SUM(grand_total), 0.0) AS total_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Cash' THEN grand_total ELSE 0 END), 0.0) AS cash_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Credit' THEN grand_total ELSE 0 END), 0.0) AS credit_revenue
         FROM invoices
         WHERE DATE(created_at) BETWEEN DATE(?) AND DATE(?)
-        GROUP BY sales_rep_name
-        ORDER BY total_revenue DESC;
-    """, (start_date, end_date))
+    """
+    params = [start_date, end_date]
+    if payment_mode and payment_mode != "All":
+        query += " AND payment_mode = ?"
+        params.append(payment_mode)
+    query += " GROUP BY sales_rep_name ORDER BY total_revenue DESC;"
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_sales_by_area(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+def get_sales_by_area(start_date: str, end_date: str, payment_mode: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+    query = """
         SELECT 
             COALESCE(NULLIF(area_name, ''), 'Unassigned') AS area_name,
             COUNT(id) AS total_invoices,
-            SUM(grand_total) AS total_revenue
+            COALESCE(SUM(grand_total), 0.0) AS total_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Cash' THEN grand_total ELSE 0 END), 0.0) AS cash_revenue,
+            COALESCE(SUM(CASE WHEN payment_mode = 'Credit' THEN grand_total ELSE 0 END), 0.0) AS credit_revenue
         FROM invoices
         WHERE DATE(created_at) BETWEEN DATE(?) AND DATE(?)
-        GROUP BY area_name
-        ORDER BY total_revenue DESC;
-    """, (start_date, end_date))
+    """
+    params = [start_date, end_date]
+    if payment_mode and payment_mode != "All":
+        query += " AND payment_mode = ?"
+        params.append(payment_mode)
+    query += " GROUP BY area_name ORDER BY total_revenue DESC;"
+
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_sales_by_product(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+def get_sales_by_product(start_date: str, end_date: str, payment_mode: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+        SELECT 
+            ii.product_name,
+            SUM(ii.quantity) AS total_quantity_sold,
+            COALESCE(SUM(ii.total_price), 0.0) AS total_revenue
+        FROM invoice_items ii
+        JOIN invoices i ON ii.invoice_id = i.id
+        WHERE DATE(i.created_at) BETWEEN DATE(?) AND DATE(?)
+    """
+    params = [start_date, end_date]
+    if payment_mode and payment_mode != "All":
+        query += " AND i.payment_mode = ?"
+        params.append(payment_mode)
+    query += " GROUP BY ii.product_name ORDER BY total_revenue DESC;"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_sales_by_payment_mode(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT 
-            ii.product_name,
-            SUM(ii.quantity) AS total_quantity_sold,
-            SUM(ii.total_price) AS total_revenue
-        FROM invoice_items ii
-        JOIN invoices i ON ii.invoice_id = i.id
-        WHERE DATE(i.created_at) BETWEEN DATE(?) AND DATE(?)
-        GROUP BY ii.product_name
+            COALESCE(NULLIF(payment_mode, ''), 'Cash') AS payment_mode,
+            COUNT(id) AS total_invoices,
+            COALESCE(SUM(subtotal), 0.0) AS total_subtotal,
+            COALESCE(SUM(discount_amount), 0.0) AS total_discount,
+            COALESCE(SUM(grand_total), 0.0) AS total_revenue
+        FROM invoices
+        WHERE DATE(created_at) BETWEEN DATE(?) AND DATE(?)
+        GROUP BY payment_mode
         ORDER BY total_revenue DESC;
     """, (start_date, end_date))
     rows = cursor.fetchall()

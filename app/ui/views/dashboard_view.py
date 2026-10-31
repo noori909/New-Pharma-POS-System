@@ -1,6 +1,6 @@
 """
-Dashboard View Widget for NQS POS v2.0
-Displays real-time KPIs, prominent Low Stock Alerts table, and quick restock dialog.
+Dashboard View Widget for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
+Displays real-time operational KPIs (including Cash vs Credit sales), low stock alerts, and recent invoices.
 """
 
 from PyQt6.QtWidgets import (
@@ -24,7 +24,7 @@ class QuickRestockDialog(QDialog):
     def __init__(self, product_id: int, product_name: str, current_stock: int, parent=None):
         super().__init__(parent)
         self.product_id = product_id
-        self.setWindowTitle("⚠️ Quick Restock - Low Stock Alert")
+        self.setWindowTitle("Quick Restock - Low Stock Alert")
         self.setFixedWidth(380)
 
         layout = QVBoxLayout(self)
@@ -36,14 +36,14 @@ class QuickRestockDialog(QDialog):
         # Product Name (Read-Only)
         self.lbl_prod_name = QLineEdit(product_name)
         self.lbl_prod_name.setReadOnly(True)
-        self.lbl_prod_name.setStyleSheet("background-color: #0F172A; color: #38BDF8; font-weight: bold;")
+        self.lbl_prod_name.setStyleSheet("font-weight: bold; color: #0284C7;")
 
         # Current Stock (Read-Only)
         self.lbl_curr_stock = QLineEdit(str(current_stock))
         self.lbl_curr_stock.setReadOnly(True)
-        self.lbl_curr_stock.setStyleSheet("background-color: #0F172A; color: #EF4444; font-weight: bold;")
+        self.lbl_curr_stock.setStyleSheet("font-weight: bold; color: #DC2626;")
 
-        # New Stock Input Field (Total Stock After Restock)
+        # New Stock Input Field
         self.spin_new_stock = QSpinBox()
         self.spin_new_stock.setRange(0, 999999)
         self.spin_new_stock.setValue(current_stock + 50)
@@ -62,7 +62,7 @@ class QuickRestockDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         btn_box.addWidget(btn_cancel)
 
-        btn_save = QPushButton("💾 Save Stock")
+        btn_save = QPushButton("Save Stock")
         btn_save.setProperty("class", "SuccessBtn")
         btn_save.clicked.connect(self.accept)
         btn_box.addWidget(btn_save)
@@ -82,17 +82,18 @@ class DashboardView(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(14, 12, 14, 12)
+        main_layout.setSpacing(12)
 
         # Header Title & Quick Actions
         hdr_layout = QHBoxLayout()
         title_box = QVBoxLayout()
         page_title = QLabel("Dashboard Overview")
         page_title.setProperty("class", "SectionHeader")
-        page_title.setStyleSheet("font-size: 20px;")
-        sub_title = QLabel("Real-time warehouse operational metrics and low-stock alerts")
-        sub_title.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        page_title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        sub_title = QLabel("New Quetta Surgical and Medicine Distribution • Real-time operational metrics and alerts")
+        sub_title.setProperty("class", "SubHeader")
+        sub_title.setStyleSheet("font-size: 12px;")
         title_box.addWidget(page_title)
         title_box.addWidget(sub_title)
         hdr_layout.addLayout(title_box)
@@ -116,8 +117,8 @@ class DashboardView(QWidget):
 
         self.card_revenue = StatCard("Today's Revenue", "PKR 0.00", "Total collected today", "#2563EB")
         self.card_invoices = StatCard("Today's Invoices", "0", "Invoices processed", "#10B981")
-        self.card_products = StatCard("Active Products", "0", "Total items in master data", "#38BDF8")
-        self.card_low_stock = StatCard("Low Stock Alerts", "0", "Items below reorder level", "#EF4444")
+        self.card_products = StatCard("Active Products", "0", "Items in catalog", "#0284C7")
+        self.card_low_stock = StatCard("Low Stock Alerts", "0", "Items below reorder level", "#DC2626")
 
         kpi_layout.addWidget(self.card_revenue)
         kpi_layout.addWidget(self.card_invoices)
@@ -134,12 +135,12 @@ class DashboardView(QWidget):
         low_stock_box = QFrame()
         low_stock_box.setProperty("class", "CardFrame")
         low_stock_inner = QVBoxLayout(low_stock_box)
-        low_stock_inner.setContentsMargins(16, 16, 16, 16)
+        low_stock_inner.setContentsMargins(12, 10, 12, 10)
         low_stock_inner.setSpacing(12)
 
         ls_header = QHBoxLayout()
-        ls_title = QLabel("🚨 Low Stock Inventory Alerts")
-        ls_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #EF4444;")
+        ls_title = QLabel("Low Stock Inventory Alerts")
+        ls_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #DC2626;")
         ls_header.addWidget(ls_title)
         ls_header.addStretch()
 
@@ -152,9 +153,14 @@ class DashboardView(QWidget):
 
         self.table_low_stock = QTableWidget()
         self.table_low_stock.setColumnCount(5)
-        self.table_low_stock.setHorizontalHeaderLabels(["Product Name", "MRP (PKR)", "Base TP", "Stock", "Action"])
+        self.table_low_stock.setHorizontalHeaderLabels(["Product Name", "MRP (PKR)", "Base Price", "Stock Level", "Action"])
         self.table_low_stock.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table_low_stock.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_low_stock.verticalHeader().setDefaultSectionSize(34)
+        self.table_low_stock.setColumnWidth(1, 85)
+        self.table_low_stock.setColumnWidth(2, 120)
+        self.table_low_stock.setColumnWidth(3, 85)
+        self.table_low_stock.setColumnWidth(4, 120)
         low_stock_inner.addWidget(self.table_low_stock)
 
         content_layout.addWidget(low_stock_box, 3)
@@ -163,18 +169,23 @@ class DashboardView(QWidget):
         recent_box = QFrame()
         recent_box.setProperty("class", "CardFrame")
         recent_inner = QVBoxLayout(recent_box)
-        recent_inner.setContentsMargins(16, 16, 16, 16)
+        recent_inner.setContentsMargins(12, 10, 12, 10)
         recent_inner.setSpacing(12)
 
-        rc_title = QLabel("🧾 Recent Sales Invoices")
-        rc_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #38BDF8;")
+        rc_title = QLabel("Recent Sales Invoices")
+        rc_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #0284C7;")
         recent_inner.addWidget(rc_title)
 
         self.table_recent_invoices = QTableWidget()
-        self.table_recent_invoices.setColumnCount(4)
-        self.table_recent_invoices.setHorizontalHeaderLabels(["Invoice #", "Customer", "Total", "PDF"])
+        self.table_recent_invoices.setColumnCount(5)
+        self.table_recent_invoices.setHorizontalHeaderLabels(["Invoice #", "Customer", "Mode", "Total", "PDF"])
         self.table_recent_invoices.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_recent_invoices.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_recent_invoices.verticalHeader().setDefaultSectionSize(34)
+        self.table_recent_invoices.setColumnWidth(0, 125)
+        self.table_recent_invoices.setColumnWidth(2, 70)
+        self.table_recent_invoices.setColumnWidth(3, 90)
+        self.table_recent_invoices.setColumnWidth(4, 65)
         recent_inner.addWidget(self.table_recent_invoices)
 
         content_layout.addWidget(recent_box, 2)
@@ -187,9 +198,13 @@ class DashboardView(QWidget):
     def load_data(self):
         summary = get_dashboard_summary()
 
-        # Update Stat Cards
+        # Update Stat Cards with Cash vs Credit breakdowns
         self.card_revenue.set_value(f"PKR {summary['today_revenue']:,.2f}")
+        self.card_revenue.set_subtext(f"Cash: PKR {summary['today_cash_revenue']:,.2f} | Credit: PKR {summary['today_credit_revenue']:,.2f}")
+
         self.card_invoices.set_value(str(summary['today_invoices_count']))
+        self.card_invoices.set_subtext(f"Cash: {summary['today_cash_count']} | Credit: {summary['today_credit_count']}")
+
         self.card_products.set_value(str(summary['total_products_count']))
         self.card_low_stock.set_value(str(summary['low_stock_count']))
 
@@ -198,19 +213,21 @@ class DashboardView(QWidget):
         self.table_low_stock.setRowCount(len(low_stock_items))
 
         for row_idx, item in enumerate(low_stock_items):
-            self.table_low_stock.setItem(row_idx, 0, QTableWidgetItem(f"⚠️ {item['name']}"))
+            self.table_low_stock.setItem(row_idx, 0, QTableWidgetItem(item['name']))
             self.table_low_stock.setItem(row_idx, 1, QTableWidgetItem(f"{item['mrp']:,.2f}"))
-            self.table_low_stock.setItem(row_idx, 2, QTableWidgetItem(f"{item['tp']:,.2f}"))
+            
+            rule_text = f"{item['tp']:,.2f} (TP)" if item.get('has_tp', True) else f"{item['tp']:,.2f} (MRP)"
+            self.table_low_stock.setItem(row_idx, 2, QTableWidgetItem(rule_text))
 
             stock_item = QTableWidgetItem(f"{item['stock']} / {item['reorder_level']}")
             stock_item.setForeground(Qt.GlobalColor.red)
             stock_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table_low_stock.setItem(row_idx, 3, stock_item)
 
-            # Red warning button for Quick Restock
-            btn_restock = QPushButton("🔴 Quick Restock")
+            btn_restock = QPushButton("Quick Restock")
             btn_restock.setProperty("class", "DangerBtn")
-            btn_restock.setStyleSheet("padding: 4px 10px; font-size: 11px; font-weight: bold;")
+            btn_restock.setFixedWidth(105)
+            btn_restock.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: bold;")
             btn_restock.clicked.connect(lambda _, p_id=item['id'], p_name=item['name'], curr_stk=item['stock']: self.open_quick_restock_dialog(p_id, p_name, curr_stk))
             self.table_low_stock.setCellWidget(row_idx, 4, btn_restock)
 
@@ -221,13 +238,22 @@ class DashboardView(QWidget):
         for row_idx, inv in enumerate(recent_invs):
             self.table_recent_invoices.setItem(row_idx, 0, QTableWidgetItem(inv['invoice_number']))
             self.table_recent_invoices.setItem(row_idx, 1, QTableWidgetItem(inv['customer_name']))
-            self.table_recent_invoices.setItem(row_idx, 2, QTableWidgetItem(f"{inv['grand_total']:,.2f}"))
+
+            mode_item = QTableWidgetItem(inv.get('payment_mode', 'Cash'))
+            if inv.get('payment_mode', 'Cash').upper() == 'CASH':
+                mode_item.setForeground(Qt.GlobalColor.darkGreen)
+            else:
+                mode_item.setForeground(Qt.GlobalColor.red)
+            self.table_recent_invoices.setItem(row_idx, 2, mode_item)
+
+            self.table_recent_invoices.setItem(row_idx, 3, QTableWidgetItem(f"{inv['grand_total']:,.2f}"))
 
             btn_pdf = QPushButton("PDF")
             btn_pdf.setProperty("class", "SecondaryBtn")
-            btn_pdf.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_pdf.setFixedWidth(50)
+            btn_pdf.setStyleSheet("padding: 3px 6px; font-size: 11px;")
             btn_pdf.clicked.connect(lambda _, i_id=inv['id']: self.print_receipt_by_id(i_id))
-            self.table_recent_invoices.setCellWidget(row_idx, 3, btn_pdf)
+            self.table_recent_invoices.setCellWidget(row_idx, 4, btn_pdf)
 
     def open_quick_restock_dialog(self, product_id: int, product_name: str, current_stock: int):
         dlg = QuickRestockDialog(product_id, product_name, current_stock, parent=self)

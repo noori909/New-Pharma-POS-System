@@ -1,7 +1,7 @@
 """
-Automated End-Of-Day (E.O.D) "Postman" Intelligence & Email Scheduler for NQS POS v2.0
+Automated End-Of-Day (E.O.D) Intelligence & Email Scheduler for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
 Triggers daily at 10:00 PM sharp (and on application startup for missed days) to compile and
-dispatch professional HTML summary emails to Boss and Stakeholders via Gmail SMTP.
+dispatch professional HTML summary emails to Stakeholders via Gmail SMTP.
 """
 
 import smtplib
@@ -22,7 +22,7 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
     """
     Compiles data and builds responsive HTML email for EOD report.
     """
-    biz_name = get_setting('business_name', 'NQS Pharmaceutical Distributors')
+    biz_name = get_setting('business_name', 'New Quetta Surgical and Medicine Distribution')
     
     # Fetch sales for target report date
     invoices = get_invoices(start_date=report_date, end_date=report_date)
@@ -31,6 +31,11 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
 
     total_revenue = sum(inv['grand_total'] for inv in invoices)
     total_invoices_count = len(invoices)
+
+    cash_revenue = sum(inv['grand_total'] for inv in invoices if (inv.get('payment_mode') or 'Cash') == 'Cash')
+    credit_revenue = sum(inv['grand_total'] for inv in invoices if (inv.get('payment_mode') or 'Cash') == 'Credit')
+    cash_count = sum(1 for inv in invoices if (inv.get('payment_mode') or 'Cash') == 'Cash')
+    credit_count = sum(1 for inv in invoices if (inv.get('payment_mode') or 'Cash') == 'Credit')
 
     # Sales Rep Table HTML
     rep_rows_html = ""
@@ -65,19 +70,17 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
         <meta charset="utf-8">
         <style>
             body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #F8FAFC; color: #0F172A; margin: 0; padding: 20px; }}
-            .container {{ max-width: 650px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
+            .container {{ max-width: 650px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #CBD5E1; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
             .header {{ background: #1E293B; color: #FFFFFF; padding: 24px; text-align: center; }}
-            .header h1 {{ margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }}
-            .header p {{ margin: 6px 0 0 0; color: #94A3B8; font-size: 13px; }}
+            .header h1 {{ margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }}
+            .header p {{ margin: 6px 0 0 0; color: #CBD5E1; font-size: 13px; }}
             .content {{ padding: 24px; }}
-            .kpi-grid {{ display: table; width: 100%; margin-bottom: 24px; }}
-            .kpi-card {{ display: table-cell; width: 50%; background: #F1F5F9; border-radius: 8px; padding: 16px; text-align: center; border: 1px solid #E2E8F0; }}
-            .kpi-title {{ font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 600; margin-bottom: 4px; }}
-            .kpi-value {{ font-size: 24px; font-weight: 700; color: #1D4ED8; }}
-            .section-title {{ font-size: 15px; font-weight: 700; color: #1E293B; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #3B82F6; padding-bottom: 4px; display: inline-block; }}
+            .kpi-title {{ font-size: 11px; text-transform: uppercase; color: #334155; font-weight: 700; margin-bottom: 4px; }}
+            .kpi-value {{ font-size: 22px; font-weight: 700; }}
+            .section-title {{ font-size: 15px; font-weight: 700; color: #1E293B; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #0284C7; padding-bottom: 4px; display: inline-block; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }}
-            th {{ background: #F1F5F9; color: #475569; text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 2px solid #CBD5E1; }}
-            .footer {{ background: #F8FAFC; padding: 16px; text-align: center; font-size: 11px; color: #94A3B8; border-top: 1px solid #E2E8F0; }}
+            th {{ background: #F1F5F9; color: #0F172A; text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 2px solid #CBD5E1; }}
+            .footer {{ background: #F8FAFC; padding: 16px; text-align: center; font-size: 11px; color: #475569; border-top: 1px solid #E2E8F0; }}
         </style>
     </head>
     <body>
@@ -87,16 +90,32 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
                 <p>Official End of Day (E.O.D) Business Intelligence Report • <b>{report_date}</b></p>
             </div>
             <div class="content">
-                <table style="width: 100%; border: none; margin-bottom: 20px;">
+                <table style="width: 100%; border: none; margin-bottom: 16px;">
                     <tr>
-                        <td style="width: 48%; background: #EFF6FF; border-radius: 8px; padding: 16px; text-align: center; border: 1px solid #BFDBFE;">
-                            <div class="kpi-title">Today's Revenue Collected</div>
+                        <td style="width: 48%; background: #EFF6FF; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid #BFDBFE;">
+                            <div class="kpi-title">Total Revenue Collected</div>
                             <div class="kpi-value" style="color: #1D4ED8;">PKR {total_revenue:,.2f}</div>
                         </td>
                         <td style="width: 4%;"></td>
-                        <td style="width: 48%; background: #F0FDF4; border-radius: 8px; padding: 16px; text-align: center; border: 1px solid #BBF7D0;">
-                            <div class="kpi-title">Invoices Processed</div>
+                        <td style="width: 48%; background: #F0FDF4; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid #BBF7D0;">
+                            <div class="kpi-title">Total Invoices Processed</div>
                             <div class="kpi-value" style="color: #15803D;">{total_invoices_count}</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <table style="width: 100%; border: none; margin-bottom: 20px;">
+                    <tr>
+                        <td style="width: 48%; background: #F8FAFC; border-radius: 8px; padding: 12px; text-align: center; border: 1px solid #CBD5E1;">
+                            <div class="kpi-title">Cash Sales</div>
+                            <div class="kpi-value" style="font-size: 18px; color: #16A34A;">PKR {cash_revenue:,.2f}</div>
+                            <div style="font-size: 11px; color: #475569;">({cash_count} invoices)</div>
+                        </td>
+                        <td style="width: 4%;"></td>
+                        <td style="width: 48%; background: #F8FAFC; border-radius: 8px; padding: 12px; text-align: center; border: 1px solid #CBD5E1;">
+                            <div class="kpi-title">Credit Sales</div>
+                            <div class="kpi-value" style="font-size: 18px; color: #DC2626;">PKR {credit_revenue:,.2f}</div>
+                            <div style="font-size: 11px; color: #475569;">({credit_count} invoices)</div>
                         </td>
                     </tr>
                 </table>
@@ -130,7 +149,7 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
                 </table>
             </div>
             <div class="footer">
-                Auto-generated by <b>NQS POS v2.0 Postman EOD Logic</b> at 10:00 PM • Disaster Recovery Backup Archived Safely.
+                Auto-generated by <b>{biz_name} POS System</b> at 10:00 PM • Disaster Recovery Backup Archived Safely.
             </div>
         </div>
     </body>
@@ -140,6 +159,8 @@ def generate_eod_html_content(report_date: str) -> Tuple[str, Dict[str, Any]]:
     summary_metrics = {
         'date': report_date,
         'total_revenue': total_revenue,
+        'cash_revenue': cash_revenue,
+        'credit_revenue': credit_revenue,
         'invoices_count': total_invoices_count
     }
 
@@ -174,7 +195,7 @@ def dispatch_eod_email(report_date: str = None) -> Dict[str, Any]:
         # Create email message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = f"E.O.D Summary Report - {report_date} | PKR {metrics['total_revenue']:,.2f} Revenue"
-        msg['From'] = f"NQS POS System <{smtp_email}>"
+        msg['From'] = f"New Quetta Surgical POS <{smtp_email}>"
         msg['To'] = ", ".join(recipients)
 
         msg.attach(MIMEText(html_body, 'html'))

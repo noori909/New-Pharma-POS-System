@@ -301,8 +301,8 @@ class MasterDataView(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(14, 12, 14, 12)
+        main_layout.setSpacing(12)
 
         # Header Title
         title_box = QVBoxLayout()
@@ -310,7 +310,7 @@ class MasterDataView(QWidget):
         page_title.setProperty("class", "SectionHeader")
         page_title.setStyleSheet("font-size: 20px;")
         sub_title = QLabel("Configure Customers, Customer Discount Tiers, Sales Representatives, and Areas")
-        sub_title.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        sub_title.setStyleSheet("color: #334155; font-size: 12px;")
         title_box.addWidget(page_title)
         title_box.addWidget(sub_title)
         main_layout.addLayout(title_box)
@@ -321,22 +321,22 @@ class MasterDataView(QWidget):
         # Tab 1: Customers
         self.tab_customers = QWidget()
         self.init_customers_tab()
-        self.tab_widget.addTab(self.tab_customers, "👥 Customers Management")
+        self.tab_widget.addTab(self.tab_customers, "Customers Management")
 
         # Tab 2: Discount Tiers
         self.tab_tiers = QWidget()
         self.init_tiers_tab()
-        self.tab_widget.addTab(self.tab_tiers, "🏷️ Discount Tiers")
+        self.tab_widget.addTab(self.tab_tiers, "Discount Tiers")
 
         # Tab 3: Sales Reps
         self.tab_reps = QWidget()
         self.init_reps_tab()
-        self.tab_widget.addTab(self.tab_reps, "👔 Sales Representatives")
+        self.tab_widget.addTab(self.tab_reps, "Sales Representatives")
 
         # Tab 4: Areas
         self.tab_areas = QWidget()
         self.init_areas_tab()
-        self.tab_widget.addTab(self.tab_areas, "📍 Geographical Areas")
+        self.tab_widget.addTab(self.tab_areas, "Geographical Areas")
 
         main_layout.addWidget(self.tab_widget)
 
@@ -350,7 +350,7 @@ class MasterDataView(QWidget):
 
         top_bar = QHBoxLayout()
         self.search_cust = QLineEdit()
-        self.search_cust.setPlaceholderText("🔍 Filter customers by name or phone...")
+        self.search_cust.setPlaceholderText("Filter customers by name or phone...")
         self.search_cust.textChanged.connect(self.load_customers)
         top_bar.addWidget(self.search_cust)
 
@@ -368,6 +368,16 @@ class MasterDataView(QWidget):
         ])
         self.table_customers.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_customers.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_customers.verticalHeader().setDefaultSectionSize(36)
+
+        # Explicit widths to guarantee zero text clipping on action buttons
+        self.table_customers.setColumnWidth(0, 40)   # #
+        # Col 1: Customer Name is Stretch
+        self.table_customers.setColumnWidth(2, 110)  # Phone
+        self.table_customers.setColumnWidth(3, 130)  # Geographical Area
+        self.table_customers.setColumnWidth(4, 110)  # Discount Tier
+        self.table_customers.setColumnWidth(5, 145)  # Actions
+
         layout.addWidget(self.table_customers)
 
         self.load_customers()
@@ -396,13 +406,15 @@ class MasterDataView(QWidget):
 
             btn_e = QPushButton("Edit")
             btn_e.setProperty("class", "SecondaryBtn")
-            btn_e.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_e.setFixedWidth(58)
+            btn_e.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_e.clicked.connect(lambda _, cust=c: self.open_edit_customer(cust))
             act_l.addWidget(btn_e)
 
             btn_d = QPushButton("Delete")
             btn_d.setProperty("class", "DangerBtn")
-            btn_d.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_d.setFixedWidth(64)
+            btn_d.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_d.clicked.connect(lambda _, c_id=c['id'], c_name=c['name']: self.delete_customer_action(c_id, c_name))
             act_l.addWidget(btn_d)
 
@@ -461,7 +473,7 @@ class MasterDataView(QWidget):
 
         top_bar = QHBoxLayout()
         lbl_info = QLabel("Configure standard customer discount tiers (e.g. 0%, 4%, 7%, 12%) applied to Trade Price (TP).")
-        lbl_info.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        lbl_info.setStyleSheet("color: #334155; font-size: 12px;")
         top_bar.addWidget(lbl_info)
         top_bar.addStretch()
 
@@ -477,6 +489,14 @@ class MasterDataView(QWidget):
         self.table_tiers.setHorizontalHeaderLabels(["#", "Tier Name", "Discount Percentage", "Actions"])
         self.table_tiers.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_tiers.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_tiers.verticalHeader().setDefaultSectionSize(36)
+
+        # Explicit widths
+        self.table_tiers.setColumnWidth(0, 40)   # #
+        # Col 1: Tier Name is Stretch
+        self.table_tiers.setColumnWidth(2, 140)  # Discount Percentage
+        self.table_tiers.setColumnWidth(3, 145)  # Actions
+
         layout.addWidget(self.table_tiers)
 
         self.load_tiers()
@@ -500,13 +520,15 @@ class MasterDataView(QWidget):
 
             btn_e = QPushButton("Edit")
             btn_e.setProperty("class", "SecondaryBtn")
-            btn_e.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_e.setFixedWidth(58)
+            btn_e.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_e.clicked.connect(lambda _, tier=t: self.open_edit_tier(tier))
             act_l.addWidget(btn_e)
 
             btn_d = QPushButton("Delete")
             btn_d.setProperty("class", "DangerBtn")
-            btn_d.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_d.setFixedWidth(64)
+            btn_d.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_d.clicked.connect(lambda _, t_id=t['id'], t_name=t['name']: self.delete_tier_action(t_id, t_name))
             act_l.addWidget(btn_d)
 
@@ -572,6 +594,15 @@ class MasterDataView(QWidget):
         self.table_reps.setHorizontalHeaderLabels(["#", "Sales Rep Name", "Phone Number", "Email Address", "Actions"])
         self.table_reps.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_reps.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_reps.verticalHeader().setDefaultSectionSize(36)
+
+        # Explicit widths
+        self.table_reps.setColumnWidth(0, 40)   # #
+        # Col 1: Sales Rep Name is Stretch
+        self.table_reps.setColumnWidth(2, 120)  # Phone Number
+        self.table_reps.setColumnWidth(3, 160)  # Email Address
+        self.table_reps.setColumnWidth(4, 145)  # Actions
+
         layout.addWidget(self.table_reps)
 
         self.load_reps()
@@ -593,13 +624,15 @@ class MasterDataView(QWidget):
 
             btn_e = QPushButton("Edit")
             btn_e.setProperty("class", "SecondaryBtn")
-            btn_e.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_e.setFixedWidth(58)
+            btn_e.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_e.clicked.connect(lambda _, rep=r: self.open_edit_rep(rep))
             act_l.addWidget(btn_e)
 
             btn_d = QPushButton("Delete")
             btn_d.setProperty("class", "DangerBtn")
-            btn_d.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_d.setFixedWidth(64)
+            btn_d.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_d.clicked.connect(lambda _, r_id=r['id'], r_name=r['name']: self.delete_rep_action(r_id, r_name))
             act_l.addWidget(btn_d)
 
@@ -665,6 +698,14 @@ class MasterDataView(QWidget):
         self.table_areas.setHorizontalHeaderLabels(["#", "Area Name", "Region / Zone", "Actions"])
         self.table_areas.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_areas.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_areas.verticalHeader().setDefaultSectionSize(36)
+
+        # Explicit widths
+        self.table_areas.setColumnWidth(0, 40)   # #
+        # Col 1: Area Name is Stretch
+        self.table_areas.setColumnWidth(2, 160)  # Region / Zone
+        self.table_areas.setColumnWidth(3, 145)  # Actions
+
         layout.addWidget(self.table_areas)
 
         self.load_areas()
@@ -685,13 +726,15 @@ class MasterDataView(QWidget):
 
             btn_e = QPushButton("Edit")
             btn_e.setProperty("class", "SecondaryBtn")
-            btn_e.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_e.setFixedWidth(58)
+            btn_e.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_e.clicked.connect(lambda _, area=a: self.open_edit_area(area))
             act_l.addWidget(btn_e)
 
             btn_d = QPushButton("Delete")
             btn_d.setProperty("class", "DangerBtn")
-            btn_d.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            btn_d.setFixedWidth(64)
+            btn_d.setStyleSheet("padding: 3px 6px; font-size: 11px; font-weight: 600;")
             btn_d.clicked.connect(lambda _, a_id=a['id'], a_name=a['name']: self.delete_area_action(a_id, a_name))
             act_l.addWidget(btn_d)
 

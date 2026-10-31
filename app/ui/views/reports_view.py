@@ -1,16 +1,17 @@
 """
-Business Intelligence & Strategic Reporting View Widget for NQS POS v2.0
-Generates breakdown reports by Sales Rep, Geographical Area, and Product Performance with PDF exports.
+Business Intelligence & Strategic Reporting View Widget for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
+Generates breakdown reports by Sales Rep, Geographical Area, Product Performance, and Cash vs Credit Payment Mode with PDF exports.
 """
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QDateEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QMessageBox, QAbstractItemView
+    QComboBox, QMessageBox, QAbstractItemView
 )
 from PyQt6.QtCore import QDate, Qt
 from app.core.models import (
-    get_sales_by_sales_rep, get_sales_by_area, get_sales_by_product
+    get_sales_by_sales_rep, get_sales_by_area, get_sales_by_product,
+    get_sales_by_payment_mode
 )
 from app.core.pdf_report import generate_bi_report_pdf
 import os
@@ -24,31 +25,32 @@ class ReportsView(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(14, 12, 14, 12)
+        main_layout.setSpacing(12)
 
         # Header Title
         title_box = QVBoxLayout()
         page_title = QLabel("Business Intelligence & Strategic Reports")
         page_title.setProperty("class", "SectionHeader")
-        page_title.setStyleSheet("font-size: 20px;")
-        sub_title = QLabel("Analyze sales performance by Representative, Geographical Area, and Product Velocity")
-        sub_title.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        page_title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        sub_title = QLabel("New Quetta Surgical and Medicine Distribution • Sales Performance, Cash/Credit Analysis & Velocity")
+        sub_title.setProperty("class", "SubHeader")
+        sub_title.setStyleSheet("font-size: 12px;")
         title_box.addWidget(page_title)
         title_box.addWidget(sub_title)
         main_layout.addLayout(title_box)
 
-        # Filter Card (Date Range + Presets + Export Button)
+        # Filter Card (Date Range + Payment Mode Filter + Presets + Export Button)
         filter_frame = QFrame()
         filter_frame.setProperty("class", "CardFrame")
         filter_layout = QHBoxLayout(filter_frame)
-        filter_layout.setContentsMargins(16, 12, 16, 12)
-        filter_layout.setSpacing(16)
+        filter_layout.setContentsMargins(12, 8, 12, 8)
+        filter_layout.setSpacing(10)
 
         # From Date
         from_box = QVBoxLayout()
         lbl_from = QLabel("From Date")
-        lbl_from.setStyleSheet("font-size: 11px; font-weight: bold; color: #94A3B8;")
+        lbl_from.setProperty("class", "FieldLabel")
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
         self.date_from.setDisplayFormat("dd/MM/yyyy")
@@ -60,7 +62,7 @@ class ReportsView(QWidget):
         # To Date
         to_box = QVBoxLayout()
         lbl_to = QLabel("To Date")
-        lbl_to.setStyleSheet("font-size: 11px; font-weight: bold; color: #94A3B8;")
+        lbl_to.setProperty("class", "FieldLabel")
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
         self.date_to.setDisplayFormat("dd/MM/yyyy")
@@ -68,6 +70,18 @@ class ReportsView(QWidget):
         to_box.addWidget(lbl_to)
         to_box.addWidget(self.date_to)
         filter_layout.addLayout(to_box)
+
+        # Payment Mode Filter
+        pay_box = QVBoxLayout()
+        lbl_pay_filter = QLabel("Payment Filter")
+        lbl_pay_filter.setProperty("class", "FieldLabel")
+        self.combo_filter_payment = QComboBox()
+        self.combo_filter_payment.addItem("All Payments", "All")
+        self.combo_filter_payment.addItem("Cash Only", "Cash")
+        self.combo_filter_payment.addItem("Credit Only", "Credit")
+        pay_box.addWidget(lbl_pay_filter)
+        pay_box.addWidget(self.combo_filter_payment)
+        filter_layout.addLayout(pay_box)
 
         btn_apply = QPushButton("Apply Filter")
         btn_apply.setProperty("class", "PrimaryBtn")
@@ -87,31 +101,36 @@ class ReportsView(QWidget):
 
         filter_layout.addStretch()
 
-        # PDF Export Button
-        btn_export = QPushButton("📄 Export Report PDF")
+        # PDF Export Button (Zero Emojis)
+        btn_export = QPushButton("Export Report PDF")
         btn_export.setProperty("class", "SuccessBtn")
         btn_export.clicked.connect(self.export_current_report_pdf)
         filter_layout.addWidget(btn_export)
 
         main_layout.addWidget(filter_frame)
 
-        # Report Tabs
+        # Report Tabs (Zero Emojis)
         self.tab_widget = QTabWidget()
 
         # Tab 1: Sales Reps
         self.tab_rep = QWidget()
         self.init_rep_tab()
-        self.tab_widget.addTab(self.tab_rep, "👔 Sales by Sales Rep")
+        self.tab_widget.addTab(self.tab_rep, "Sales by Sales Rep")
 
         # Tab 2: Areas
         self.tab_area = QWidget()
         self.init_area_tab()
-        self.tab_widget.addTab(self.tab_area, "📍 Sales by Area")
+        self.tab_widget.addTab(self.tab_area, "Sales by Area")
 
         # Tab 3: Products
         self.tab_product = QWidget()
         self.init_product_tab()
-        self.tab_widget.addTab(self.tab_product, "📦 Sales by Product")
+        self.tab_widget.addTab(self.tab_product, "Sales by Product")
+
+        # Tab 4: Payment Mode (Cash vs Credit)
+        self.tab_payment = QWidget()
+        self.init_payment_tab()
+        self.tab_widget.addTab(self.tab_payment, "Sales by Payment Mode")
 
         main_layout.addWidget(self.tab_widget)
 
@@ -141,9 +160,13 @@ class ReportsView(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         self.table_rep = QTableWidget()
         self.table_rep.setColumnCount(4)
-        self.table_rep.setHorizontalHeaderLabels(["#", "Sales Representative Name", "Total Invoices Generated", "Total Revenue (PKR)"])
+        self.table_rep.setHorizontalHeaderLabels(["Sr.", "Sales Representative Name", "Total Invoices Generated", "Total Revenue (PKR)"])
         self.table_rep.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_rep.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_rep.verticalHeader().setDefaultSectionSize(34)
+        self.table_rep.setColumnWidth(0, 45)
+        self.table_rep.setColumnWidth(2, 170)
+        self.table_rep.setColumnWidth(3, 170)
         layout.addWidget(self.table_rep)
 
     def init_area_tab(self):
@@ -151,9 +174,13 @@ class ReportsView(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         self.table_area = QTableWidget()
         self.table_area.setColumnCount(4)
-        self.table_area.setHorizontalHeaderLabels(["#", "Geographical Area", "Total Invoices Generated", "Total Revenue (PKR)"])
+        self.table_area.setHorizontalHeaderLabels(["Sr.", "Geographical Area", "Total Invoices Generated", "Total Revenue (PKR)"])
         self.table_area.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_area.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_area.verticalHeader().setDefaultSectionSize(34)
+        self.table_area.setColumnWidth(0, 45)
+        self.table_area.setColumnWidth(2, 170)
+        self.table_area.setColumnWidth(3, 170)
         layout.addWidget(self.table_area)
 
     def init_product_tab(self):
@@ -161,16 +188,39 @@ class ReportsView(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         self.table_product = QTableWidget()
         self.table_product.setColumnCount(4)
-        self.table_product.setHorizontalHeaderLabels(["#", "Product Name", "Total Quantity Sold", "Total Revenue Generated (PKR)"])
+        self.table_product.setHorizontalHeaderLabels(["Sr.", "Product Name", "Total Quantity Sold", "Total Revenue Generated (PKR)"])
         self.table_product.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_product.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_product.verticalHeader().setDefaultSectionSize(34)
+        self.table_product.setColumnWidth(0, 45)
+        self.table_product.setColumnWidth(2, 140)
+        self.table_product.setColumnWidth(3, 170)
         layout.addWidget(self.table_product)
+
+    def init_payment_tab(self):
+        layout = QVBoxLayout(self.tab_payment)
+        layout.setContentsMargins(16, 16, 16, 16)
+        self.table_payment = QTableWidget()
+        self.table_payment.setColumnCount(6)
+        self.table_payment.setHorizontalHeaderLabels([
+            "Sr.", "Payment Mode", "Invoices Count", "Gross Amount (PKR)", "Discount Amount (PKR)", "Net Revenue (PKR)"
+        ])
+        self.table_payment.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table_payment.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_payment.verticalHeader().setDefaultSectionSize(34)
+        self.table_payment.setColumnWidth(0, 45)
+        self.table_payment.setColumnWidth(2, 120)
+        self.table_payment.setColumnWidth(3, 150)
+        self.table_payment.setColumnWidth(4, 150)
+        self.table_payment.setColumnWidth(5, 160)
+        layout.addWidget(self.table_payment)
 
     def load_all_reports(self):
         d_from, d_to, _ = self.get_date_strings()
+        pay_filter = self.combo_filter_payment.currentData()
 
         # 1. Sales Reps Report
-        rep_rows = get_sales_by_sales_rep(d_from, d_to)
+        rep_rows = get_sales_by_sales_rep(d_from, d_to, payment_mode=pay_filter)
         self.table_rep.setRowCount(len(rep_rows))
         for idx, r in enumerate(rep_rows):
             self.table_rep.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
@@ -179,7 +229,7 @@ class ReportsView(QWidget):
             self.table_rep.setItem(idx, 3, QTableWidgetItem(f"{r['total_revenue']:,.2f}"))
 
         # 2. Area Report
-        area_rows = get_sales_by_area(d_from, d_to)
+        area_rows = get_sales_by_area(d_from, d_to, payment_mode=pay_filter)
         self.table_area.setRowCount(len(area_rows))
         for idx, r in enumerate(area_rows):
             self.table_area.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
@@ -188,7 +238,7 @@ class ReportsView(QWidget):
             self.table_area.setItem(idx, 3, QTableWidgetItem(f"{r['total_revenue']:,.2f}"))
 
         # 3. Product Report
-        prod_rows = get_sales_by_product(d_from, d_to)
+        prod_rows = get_sales_by_product(d_from, d_to, payment_mode=pay_filter)
         self.table_product.setRowCount(len(prod_rows))
         for idx, r in enumerate(prod_rows):
             self.table_product.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
@@ -196,19 +246,41 @@ class ReportsView(QWidget):
             self.table_product.setItem(idx, 2, QTableWidgetItem(str(r['total_quantity_sold'])))
             self.table_product.setItem(idx, 3, QTableWidgetItem(f"{r['total_revenue']:,.2f}"))
 
+        # 4. Payment Mode Report (Cash vs Credit)
+        pay_rows = get_sales_by_payment_mode(d_from, d_to)
+        self.table_payment.setRowCount(len(pay_rows))
+        for idx, r in enumerate(pay_rows):
+            self.table_payment.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
+
+            mode_item = QTableWidgetItem(r['payment_mode'])
+            if r['payment_mode'].upper() == 'CASH':
+                mode_item.setForeground(Qt.GlobalColor.darkGreen)
+            else:
+                mode_item.setForeground(Qt.GlobalColor.red)
+            self.table_payment.setItem(idx, 1, mode_item)
+
+            self.table_payment.setItem(idx, 2, QTableWidgetItem(str(r['total_invoices'])))
+            self.table_payment.setItem(idx, 3, QTableWidgetItem(f"{r['total_subtotal']:,.2f}"))
+            self.table_payment.setItem(idx, 4, QTableWidgetItem(f"{r['total_discount']:,.2f}"))
+            self.table_payment.setItem(idx, 5, QTableWidgetItem(f"{r['total_revenue']:,.2f}"))
+
     def export_current_report_pdf(self):
         d_from, d_to, display_range = self.get_date_strings()
         curr_tab = self.tab_widget.currentIndex()
+        pay_filter = self.combo_filter_payment.currentData()
 
         if curr_tab == 0:
             report_type = "rep"
-            rows = get_sales_by_sales_rep(d_from, d_to)
+            rows = get_sales_by_sales_rep(d_from, d_to, payment_mode=pay_filter)
         elif curr_tab == 1:
             report_type = "area"
-            rows = get_sales_by_area(d_from, d_to)
-        else:
+            rows = get_sales_by_area(d_from, d_to, payment_mode=pay_filter)
+        elif curr_tab == 2:
             report_type = "product"
-            rows = get_sales_by_product(d_from, d_to)
+            rows = get_sales_by_product(d_from, d_to, payment_mode=pay_filter)
+        else:
+            report_type = "payment_mode"
+            rows = get_sales_by_payment_mode(d_from, d_to)
 
         if not rows:
             QMessageBox.warning(self, "No Data", "There is no data to export for the selected date range.")

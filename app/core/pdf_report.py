@@ -1,6 +1,6 @@
 """
-ReportLab PDF Business Intelligence Report Generator for NQS POS v2.0
-Generates exportable PDF reports for Sales by Rep, Sales by Area, and Sales by Product.
+ReportLab PDF Business Intelligence Report Generator for New Quetta Surgical and Medicine Distribution
+Generates exportable PDF reports for Sales by Rep, Sales by Area, Sales by Product, and Sales by Payment Mode.
 """
 
 from datetime import datetime
@@ -18,7 +18,7 @@ from app.core.database import get_app_data_dir
 def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: list, output_path: str = None) -> str:
     """
     Generates a PDF business intelligence report.
-    report_type: "rep", "area", or "product"
+    report_type: "rep", "area", "product", or "payment_mode"
     """
     if not output_path:
         reports_dir = get_app_data_dir() / "reports"
@@ -41,7 +41,8 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
     titles_map = {
         'rep': ('SALES PERFORMANCE BY SALES REPRESENTATIVE', ['#', 'Sales Representative', 'Total Invoices', 'Revenue Generated (PKR)']),
         'area': ('SALES PERFORMANCE BY GEOGRAPHICAL AREA', ['#', 'Geographical Area', 'Total Invoices', 'Revenue Generated (PKR)']),
-        'product': ('PRODUCT MOVEMENT & SALES PERFORMANCE', ['#', 'Product Name', 'Total Quantity Sold', 'Revenue Generated (PKR)'])
+        'product': ('PRODUCT MOVEMENT & SALES PERFORMANCE', ['#', 'Product Name', 'Total Quantity Sold', 'Revenue Generated (PKR)']),
+        'payment_mode': ('SALES SUMMARY BY PAYMENT MODE (CASH VS CREDIT)', ['#', 'Payment Mode', 'Total Invoices', 'Revenue Generated (PKR)'])
     }
 
     report_title, headers = titles_map.get(report_type.lower(), ('BUSINESS INTELLIGENCE REPORT', ['#', 'Name', 'Count', 'Revenue (PKR)']))
@@ -50,17 +51,17 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
         'RptTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=20,
+        fontSize=15,
+        leading=19,
         textColor=colors.HexColor('#0F172A')
     )
     subtitle_style = ParagraphStyle(
         'RptSub',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10,
+        fontSize=9.5,
         leading=13,
-        textColor=colors.HexColor('#475569')
+        textColor=colors.HexColor('#334155')
     )
     hdr_cell = ParagraphStyle(
         'HdrCell',
@@ -99,13 +100,19 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
 
     story = []
 
-    # Header
-    biz_name = get_setting('business_name', 'NQS Pharmaceutical Distributors')
+    # Store Header
+    biz_name = get_setting('business_name', 'New Quetta Surgical and Medicine Distribution')
+    biz_address = get_setting('business_address', 'Ramzan Plaza Near Saleem Complex, Ptail Bagh. Quetta.')
+    biz_phone = get_setting('business_phone', '0334-2045896')
+    biz_email = get_setting('business_email', 'newquettamedicalandsurgical@gmail.com')
+
     story.append(Paragraph(f"<b>{biz_name}</b>", title_style))
     story.append(Spacer(1, 2))
-    story.append(Paragraph(f"{report_title}<br/><font color='#2563EB'><b>Filter Date Range:</b> {date_range_str}</font>", subtitle_style))
-    story.append(Spacer(1, 10))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=14))
+    story.append(Paragraph(f"{biz_address} • Phone: {biz_phone} • E-Mail: {biz_email}", subtitle_style))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"<b>{report_title}</b><br/><font color='#1D4ED8'><b>Filter Date Range:</b> {date_range_str}</font>", subtitle_style))
+    story.append(Spacer(1, 8))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=12))
 
     # Data Table
     table_data = [[
@@ -125,6 +132,10 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
             rev = float(row.get('total_revenue', 0.0))
         elif report_type == 'area':
             name = str(row.get('area_name', ''))
+            count = int(row.get('total_invoices', 0))
+            rev = float(row.get('total_revenue', 0.0))
+        elif report_type == 'payment_mode':
+            name = str(row.get('payment_mode', ''))
             count = int(row.get('total_invoices', 0))
             rev = float(row.get('total_revenue', 0.0))
         else: # product
@@ -154,7 +165,7 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
     report_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
         ('PADDING', (0, 0), (-1, -1), 6),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8FAFC')]),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E2E8F0')),
@@ -162,12 +173,12 @@ def generate_bi_report_pdf(report_type: str, date_range_str: str, data_rows: lis
     ]))
 
     story.append(report_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 16))
 
     # Footer
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E2E8F0'), spaceAfter=10))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E2E8F0'), spaceAfter=8))
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    story.append(Paragraph(f"Report Generated on: {now_str} • NQS POS v2.0 Strategic Reporting Engine", ParagraphStyle('Foot', parent=styles['Normal'], fontSize=8, leading=10, alignment=1, textColor=colors.HexColor('#94A3B8'))))
+    story.append(Paragraph(f"Report Generated on: {now_str} • {biz_name}", ParagraphStyle('Foot', parent=styles['Normal'], fontSize=8, leading=10, alignment=1, textColor=colors.HexColor('#64748B'))))
 
     doc.build(story)
     return output_path

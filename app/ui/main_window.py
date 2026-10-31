@@ -1,5 +1,5 @@
 """
-Main Window & Navigation Shell for NQS POS v2.0
+Main Window & Navigation Shell for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
 Assembles sidebar navigation, top header bar, view stack, theme toggles, and 10 PM EOD background timer.
 """
 
@@ -23,8 +23,9 @@ from app.services.eod_postman import dispatch_eod_email, check_and_run_eod_start
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NQS POS v2.0 - New Pharma POS System")
-        self.resize(1280, 800)
+        self.setWindowTitle("New Quetta Surgical and Medicine Distribution - POS System")
+        self.resize(1300, 820)
+        self.setMinimumSize(1180, 720)
 
         # Run startup check for missed yesterday EOD email
         try:
@@ -46,32 +47,32 @@ class MainWindow(QMainWindow):
         # 1. SIDEBAR NAVIGATION
         self.sidebar_frame = QFrame()
         self.sidebar_frame.setObjectName("SidebarFrame")
-        self.sidebar_frame.setFixedWidth(230)
+        self.sidebar_frame.setFixedWidth(210)
         sidebar_layout = QVBoxLayout(self.sidebar_frame)
         sidebar_layout.setContentsMargins(12, 16, 12, 16)
         sidebar_layout.setSpacing(8)
 
         # App Brand Header
         brand_box = QVBoxLayout()
-        brand_title = QLabel("NQS POS v2.0")
+        brand_title = QLabel("New Quetta Surgical")
         brand_title.setObjectName("AppTitleLabel")
-        brand_sub = QLabel("Pharma Distribution System")
+        brand_sub = QLabel("Medicine Distribution System")
         brand_sub.setObjectName("SubTitleLabel")
         brand_box.addWidget(brand_title)
         brand_box.addWidget(brand_sub)
         sidebar_layout.addLayout(brand_box)
         sidebar_layout.addSpacing(16)
 
-        # Nav Buttons Group
+        # Nav Buttons Group (Zero Emojis)
         self.nav_button_group = QButtonGroup(self)
         self.nav_button_group.setExclusive(True)
 
-        self.btn_nav_dashboard = self.create_nav_button("📊 Dashboard", 0)
-        self.btn_nav_pos = self.create_nav_button("⚡ New Sale / POS", 1)
-        self.btn_nav_inventory = self.create_nav_button("📦 Inventory & Stock", 2)
-        self.btn_nav_master = self.create_nav_button("👥 Master Data", 3)
-        self.btn_nav_reports = self.create_nav_button("📈 BI Reports", 4)
-        self.btn_nav_settings = self.create_nav_button("⚙️ Settings & Backup", 5)
+        self.btn_nav_dashboard = self.create_nav_button("Dashboard", 0)
+        self.btn_nav_pos = self.create_nav_button("New Sale / POS", 1)
+        self.btn_nav_inventory = self.create_nav_button("Inventory & Stock", 2)
+        self.btn_nav_master = self.create_nav_button("Master Data", 3)
+        self.btn_nav_reports = self.create_nav_button("BI Reports", 4)
+        self.btn_nav_settings = self.create_nav_button("Settings & Backup", 5)
 
         sidebar_layout.addWidget(self.btn_nav_dashboard)
         sidebar_layout.addWidget(self.btn_nav_pos)
@@ -82,8 +83,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Sidebar Footer Status
-        lbl_version = QLabel("Single-Workstation Build v2.0")
-        lbl_version.setStyleSheet("color: #64748B; font-size: 10px; padding: 4px;")
+        lbl_version = QLabel("NQS POS Build v2.0")
+        lbl_version.setProperty("class", "SubHeader")
+        lbl_version.setStyleSheet("font-size: 11px; padding: 4px;")
         sidebar_layout.addWidget(lbl_version)
 
         main_layout.addWidget(self.sidebar_frame)
@@ -97,19 +99,20 @@ class MainWindow(QMainWindow):
         # Header Frame
         self.header_frame = QFrame()
         self.header_frame.setObjectName("HeaderFrame")
-        self.header_frame.setFixedHeight(54)
+        self.header_frame.setFixedHeight(46)
         header_layout = QHBoxLayout(self.header_frame)
         header_layout.setContentsMargins(20, 0, 20, 0)
 
         self.lbl_clock = QLabel()
-        self.lbl_clock.setStyleSheet("font-weight: bold; color: #94A3B8; font-size: 12px;")
+        self.lbl_clock.setProperty("class", "SubHeader")
+        self.lbl_clock.setStyleSheet("font-weight: bold; font-size: 12px;")
         header_layout.addWidget(self.lbl_clock)
         header_layout.addStretch()
 
-        # Theme Toggle Button
-        self.btn_theme_toggle = QPushButton("🌙 Dark")
+        # Theme Toggle Button (Zero Emojis)
+        self.btn_theme_toggle = QPushButton("Light Theme")
         self.btn_theme_toggle.setProperty("class", "SecondaryBtn")
-        self.btn_theme_toggle.setStyleSheet("padding: 5px 12px; font-size: 12px;")
+        self.btn_theme_toggle.setStyleSheet("padding: 5px 14px; font-size: 12px; font-weight: bold;")
         self.btn_theme_toggle.clicked.connect(self.toggle_theme)
         header_layout.addWidget(self.btn_theme_toggle)
 
@@ -188,10 +191,10 @@ class MainWindow(QMainWindow):
     def apply_theme(self, theme_name: str):
         if theme_name == 'light':
             self.setStyleSheet(LIGHT_THEME_QSS)
-            self.btn_theme_toggle.setText("☀️ Light")
+            self.btn_theme_toggle.setText("Dark Theme")
         else:
             self.setStyleSheet(DARK_THEME_QSS)
-            self.btn_theme_toggle.setText("🌙 Dark")
+            self.btn_theme_toggle.setText("Light Theme")
 
     def toggle_theme(self):
         curr_theme = get_setting('theme', 'dark')

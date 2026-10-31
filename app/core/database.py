@@ -1,5 +1,5 @@
 """
-Database Layer & Schema Migration Engine for NQS POS v2.0
+Database Layer & Schema Migration Engine for New Quetta Surgical and Medicine Distribution (NQS POS v2.0)
 Handles SQLite connection setup, initial table creation, and incremental schema migrations.
 Stored in %APPDATA%/NQS_POS/nqs_pos.db for machine independence and data safety.
 """
@@ -68,6 +68,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
         mrp REAL NOT NULL DEFAULT 0.0,
+        has_tp INTEGER NOT NULL DEFAULT 1,
+        default_discount REAL NOT NULL DEFAULT 0.0,
         stock INTEGER NOT NULL DEFAULT 0,
         reorder_level INTEGER NOT NULL DEFAULT 10,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -123,6 +125,7 @@ def init_db():
         sales_rep_name TEXT NOT NULL,
         area_name TEXT DEFAULT '',
         discount_tier REAL NOT NULL DEFAULT 0.0,
+        payment_mode TEXT NOT NULL DEFAULT 'Cash',
         subtotal REAL NOT NULL DEFAULT 0.0,
         discount_amount REAL NOT NULL DEFAULT 0.0,
         grand_total REAL NOT NULL DEFAULT 0.0,
@@ -140,6 +143,7 @@ def init_db():
         product_id INTEGER NOT NULL,
         product_name TEXT NOT NULL,
         mrp REAL NOT NULL,
+        has_tp INTEGER NOT NULL DEFAULT 1,
         tp REAL NOT NULL,
         discount_percent REAL NOT NULL,
         final_rate REAL NOT NULL,
@@ -158,7 +162,7 @@ def init_db():
     );
     """)
 
-    # Initial App Settings (seq_num initialized to 1 as requested)
+    # Default App Settings
     default_settings = {
         'next_invoice_seq': '1',  # Starting value 1 -> NQS-001-DD-MM-YY
         'smtp_email': '',
@@ -167,9 +171,16 @@ def init_db():
         'gdrive_folder_id': '',
         'theme': 'dark',
         'last_eod_date': '',
-        'business_name': 'NQS Pharmaceutical Distributors',
-        'business_address': 'Warehouse Complex, Main Industrial Estate',
-        'business_phone': '+92-300-1234567'
+        'business_name': 'New Quetta Surgical and Medicine Distribution',
+        'business_address': 'Ramzan Plaza Near Saleem Complex, Ptail Bagh. Quetta.',
+        'business_phone': '0334-2045896',
+        'business_email': 'newquettamedicalandsurgical@gmail.com',
+        'warranty_text': (
+            'Warranty: Under section 23(1) of the drug act 1976, I Nazir Ahmed being a person resident in Pakistan '
+            'Carrying business at Ramzan plaza Patail Bagh Quetta under the name of New Quetta Surgical and Medicine Distribution '
+            'being an authorized distributor do hereby give this warranty that drugs described in this invoice bill as sold by us '
+            'do not contrivance in any way the provisions of section 23 of drug act 1976.'
+        )
     }
 
     for key, val in default_settings.items():
@@ -202,10 +213,13 @@ def run_migrations(conn: sqlite3.Connection):
     """
     cursor = conn.cursor()
 
-    # Helper to check if version is applied
     def is_applied(v_id: int) -> bool:
         cursor.execute("SELECT 1 FROM schema_migrations WHERE version = ?;", (v_id,))
         return cursor.fetchone() is not None
+
+    def column_exists(table: str, col: str) -> bool:
+        cursor.execute(f"PRAGMA table_info({table});")
+        return any(r['name'] == col for r in cursor.fetchall())
 
     # Migration 1: Base Version Tracker
     if not is_applied(1):
@@ -216,4 +230,54 @@ def run_migrations(conn: sqlite3.Connection):
     if not is_applied(2):
         cursor.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('next_invoice_seq', '1');")
         cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (2, 'Ensure starting invoice seq set to 1');")
+        conn.commit()
+
+    # Migration 3: Add has_tp and default_discount to products
+    if not is_applied(3):
+        if not column_exists('products', 'has_tp'):
+            cursor.execute("ALTER TABLE products ADD COLUMN has_tp INTEGER NOT NULL DEFAULT 1;")
+        if not column_exists('products', 'default_discount'):
+            cursor.execute("ALTER TABLE products ADD COLUMN default_discount REAL NOT NULL DEFAULT 0.0;")
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (3, 'Add has_tp and default_discount to products');")
+        conn.commit()
+
+    # Migration 4: Add payment_mode to invoices
+    if not is_applied(4):
+        if not column_exists('invoices', 'payment_mode'):
+            cursor.execute("ALTER TABLE invoices ADD COLUMN payment_mode TEXT NOT NULL DEFAULT 'Cash';")
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (4, 'Add payment_mode to invoices');")
+        conn.commit()
+
+    # Migration 5: Add has_tp to invoice_items
+    if not is_applied(5):
+        if not column_exists('invoice_items', 'has_tp'):
+            cursor.execute("ALTER TABLE invoice_items ADD COLUMN has_tp INTEGER NOT NULL DEFAULT 1;")
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (5, 'Add has_tp to invoice_items');")
+        conn.commit()
+
+    # Migration 6: Update store branding, contact, and warranty
+    if not is_applied(6):
+        cursor.execute("""
+            UPDATE app_settings 
+            SET value = 'New Quetta Surgical and Medicine Distribution' 
+            WHERE key = 'business_name' AND (value = 'NQS Pharmaceutical Distributors' OR value = '');
+        """)
+        cursor.execute("""
+            UPDATE app_settings 
+            SET value = 'Ramzan Plaza Near Saleem Complex, Ptail Bagh. Quetta.' 
+            WHERE key = 'business_address' AND (value LIKE '%Warehouse%' OR value = '');
+        """)
+        cursor.execute("""
+            UPDATE app_settings 
+            SET value = '0334-2045896' 
+            WHERE key = 'business_phone' AND (value LIKE '%+92-300-1234567%' OR value = '');
+        """)
+        cursor.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('business_email', 'newquettamedicalandsurgical@gmail.com');")
+        cursor.execute("""
+            INSERT OR REPLACE INTO app_settings (key, value) VALUES (
+                'warranty_text', 
+                'Warranty: Under section 23(1) of the drug act 1976, I Nazir Ahmed being a person resident in Pakistan Carrying business at Ramzan plaza Patail Bagh Quetta under the name of New Quetta Surgical and Medicine Distribution being an authorized distributor do hereby give this warranty that drugs described in this invoice bill as sold by us do not contrivance in any way the provisions of section 23 of drug act 1976.'
+            );
+        """)
+        cursor.execute("INSERT INTO schema_migrations (version, description) VALUES (6, 'Update store branding, contact, and warranty');")
         conn.commit()
