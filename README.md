@@ -3,7 +3,6 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/GUI-PyQt6-green.svg)](https://pypi.org/project/PyQt6/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57.svg)](https://www.sqlite.org/)
-[![PDF Engine](https://img.shields.io/badge/PDF-ReportLab-red.svg)](https://pypi.org/project/reportlab/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6.svg)]()
 [![License](https://img.shields.io/badge/License-Proprietary-darkgrey.svg)]()
 
@@ -46,8 +45,6 @@ Engineered with **PyQt6**, **SQLite**, and **ReportLab**, the application is opt
 * Contains full distributor identification, date, time, sales representative, customer details, and invoice sequence.
 * Line items detail Product Name, MRP, Rate Type, Base Price, Discount %, Final Rate, Quantity, and Line Total.
 * Integrated Pakistani Rupee currency words converter (e.g. `Rupees five thousand four hundred ninety-two Only`).
-* Statutory warranty text:
-  > *Warranty: Under section 23(1) of the drug act 1976, I Nazir Ahmed being a person resident in Pakistan Carrying business at Ramzan plaza Patail Bagh Quetta under the name of New Quetta Surgical and Medicine Distribution being an authorized distributor do hereby give this warranty that drugs described in this invoice bill as sold by us do not contrivance in any way the provisions of section 23 of drug act 1976.*
 * Formal authorized signature block: `For New Quetta Surgical and Medicine Distribution`.
 
 ### 3. Inventory & Catalog Management
@@ -200,8 +197,3 @@ All persistent application data, configuration keys, receipts, and local backups
 | **Operating System** | Microsoft Windows 10 / 11 (64-bit) |
 
 ---
-
-## License & Ownership
-
-Copyright 2026 New Quetta Surgical and Medicine Distribution. All rights reserved.  
-This software is proprietary and confidential. Unauthorized copying, distribution, or modification of this file is strictly prohibited.
